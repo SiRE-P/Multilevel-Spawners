@@ -116,6 +116,14 @@ spread_draws(fit, log_run[year]) %>%
   xlab("")
 ggsave("./figures/spawner_abund.pdf", height = 4, width = 7)
 
+spawners_est <- spread_draws(fit, log_run[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>% 
+  group_by(year) %>% 
+  summarise(spawners_ln = median(log_run), sd = sd(log_run))
+
+write.csv(spawners_est, file = "../../okanagan_spawn_fry_model/outputs/spawners_est.csv")
+
+
 spread_draws(fit, arrival[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>%
   ggplot(aes(x = year, y = arrival + 240))+
