@@ -15,6 +15,8 @@ spawners <- read.csv("../../../okanagan_data/2025-04-07 Draft/Spawn Timing Data/
   mutate(date = as.Date(date), year = year(date), yday = yday(date))
 
 index_sk <- spawners %>% 
+  mutate(duplicate = duplicated(.)) %>% 
+  filter(duplicate==FALSE) %>% 
   group_by(location, year, yday, date) %>% 
   filter(location == "Index") %>% 
   filter(species == "sk") %>% 
