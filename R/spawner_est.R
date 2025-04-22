@@ -116,7 +116,7 @@ spread_draws(fit, log_run[year]) %>%
   xlab("")
 ggsave("./figures/spawner_abund.pdf", height = 4, width = 7)
 
-And spread_draws(fit, arrival[year]) %>% 
+spread_draws(fit, arrival[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>%
   ggplot(aes(x = year, y = arrival + 240))+
   stat_pointinterval()+
@@ -190,7 +190,7 @@ dead <- sapply(15:max(sp_dat$day), FUN = function(x) {
   mutate(draw = row_number()) %>%
   pivot_longer(-draw, names_to = "day", values_to = "spawners") %>%
   mutate(day = as.integer(gsub("V", "", day))+14) %>% 
-  mutate(type = "dead")
+  mutate(type = "newly dead")
 
 counts <- sapply(15:max(sp_dat$day), FUN = function(x) {
   entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
