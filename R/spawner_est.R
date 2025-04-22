@@ -14,13 +14,6 @@ theme_set(theme_bw())
 spawners <- read.csv("../../../okanagan_data/2025-04-07 Draft/Spawn Timing Data/spawn_timing.csv") %>% 
   mutate(date = as.Date(date), year = year(date), yday = yday(date))
 
-spawners_old <- readxl::read_excel("../../../data/Okanagan/!CNAT 2020/CNAT_Escapement Units_2020.xlsx", sheet = "Escapement Units") %>% 
-  janitor::clean_names()
-spawners_old <- select(spawners_old, year, spawners = au_cindex) %>% 
-  filter(!is.na(year)) %>% 
-  arrange(year) %>% 
-  mutate(spawners =ifelse(year == 2011, NA, spawners))
-
 index_sk <- spawners %>% 
   group_by(location, year, yday, date) %>% 
   filter(location == "Index") %>% 
@@ -47,6 +40,22 @@ index_sk %>%
   ggplot(aes(x = yday, y = live, color = location))+
   geom_point()+
   facet_wrap(~year)
+
+#trad AUC####
+trad_AUC <- index_sk %>%            
+  group_by(year) %>%   
+  mutate(tdiff = date - lag(date),                      
+         tdiff = replace(tdiff, which(tdiff < 0), NA),
+         xbar = (live + lag(live))/2, 
+         fishdays = case_when(                          
+           is.na(xbar) ~ live * 11/2,         
+           !is.na(xbar) ~ as.numeric(tdiff) * xbar
+         ),
+         cumulative = collapse::fcumsum(fishdays)) %>%  
+  group_by(year) %>%     
+  summarise(total_auc = max(cumulative, na.rm = TRUE) +
+              (live[which.max(date)]*(11/2)), #this adds in the right tail.
+            nerkids = round(total_auc/11,0))
 
 
 #set up data for model####
@@ -101,13 +110,13 @@ spread_draws(fit, log_run[year]) %>%
   mutate(year = year + min(spawners$year)-1) %>% 
   ggplot(aes(x = year, y = exp(log_run)))+
   stat_pointinterval(aes(color = "modelled"))+
-  geom_point(data = spawners_old %>% filter(year > 1999), aes(x = year, y = spawners, color = "AUC"))+
+  geom_point(data = trad_AUC, aes(x = year, y = nerkids, color = "trad. AUC"))+
   scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawner abundance (thousands)", expand = expansion(mult = c(0, 0.02)))+
-  scale_color_manual(values = c("red", 1), "")+
+  scale_color_manual(values = c(1, "red"), "")+
   xlab("")
 ggsave("./figures/spawner_abund.pdf", height = 4, width = 7)
 
-spread_draws(fit, arrival[year]) %>% 
+And spread_draws(fit, arrival[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>%
   ggplot(aes(x = year, y = arrival + 240))+
   stat_pointinterval()+
