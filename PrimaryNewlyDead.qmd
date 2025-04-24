@@ -37,6 +37,7 @@ keywords:
   - Osoyoos Lake
   - Okanagan River
   - Columbia River 
+appendix: true
 format:
   elsevier-pdf:
     keep-tex: true
@@ -99,7 +100,7 @@ trad_AUC <- index_sk %>%
            is.na(xbar) ~ live * 11/2,         
            !is.na(xbar) ~ as.numeric(tdiff) * xbar
          ),
-         cumulative = collapse::fcumsum(fishdays)) %>%  
+         cumulative = cumsum(fishdays)) %>%  
   group_by(year) %>%     
   summarise(total_auc = max(cumulative, na.rm = TRUE) +
               (live[which.max(date)]*(11/2)), #this adds in the right tail.
@@ -121,31 +122,36 @@ sp_dat = list(n_priors = nrow(priors),
               live_counts = index_sk$live)
 
 
-stan_file <- "./stan/spawners.stan"
-fit_file <- "./model_fits/spawner_m.RData"
-hash_file <- "./model_fits/spawner_m.md5"
-
-# Compute current hash
-current_hash <- unname(tools::md5sum(stan_file))
-
-# Check conditions and fit model if needed
-if(!file.exists(fit_file) || !file.exists(hash_file) || 
-   readLines(hash_file) != current_hash) {
+run_or_load_stan <- function(model_name, stan_path, data_list, chains = 4, cores = 4) {
+  fit_file <- paste0("./model_fits/", model_name, ".RData")
+  hash_file <- paste0("./model_fits/", model_name, ".md5")
+  current_hash <- unname(tools::md5sum(stan_path))
   
-  message("Compiling and fitting Stan model...")
-  m <- stan_model(file = stan_file)
-  fit <- sampling(mod, data = sp_dat, chains = 4, cores = 4)
-  
-  save(fit, m, file = fit_file)
-  writeLines(current_hash, hash_file)
-  
-} else {
-  message("Loading previously saved fit...")
-  load(fit_file)
+  if (!file.exists(fit_file) || !file.exists(hash_file) || readLines(hash_file) != current_hash) {
+    message("Fitting ", model_name, "...")
+    m <- stan_model(file = stan_path)
+    fit <- sampling(m, data = data_list, chains = chains, cores = cores)
+    save(fit, m, file = fit_file)
+    writeLines(current_hash, hash_file)
+  } else {
+    message("Loading saved fit for ", model_name, "...")
+    load(fit_file)
+  }
+  return(fit)
 }
 
+fit_m1 <- run_or_load_stan("spawner_m1", "./stan/spawners_m1.stan", sp_dat)
+fit_m2 <- run_or_load_stan("spawner_m2", "./stan/spawners_m2.stan", sp_dat)
+fit_m3 <- run_or_load_stan("spawner_m3", "./stan/spawners_m3.stan", sp_dat)
+fit_m4 <- run_or_load_stan("spawner_m4", "./stan/spawners_m4.stan", sp_dat)
+fit_m5 <- run_or_load_stan("spawner_m5", "./stan/spawners_m5.stan", sp_dat)
+fit_m6 <- run_or_load_stan("spawner_m6", "./stan/spawners_m6.stan", sp_dat)
+fit_m7 <- run_or_load_stan("spawner_m7", "./stan/spawners_m7.stan", sp_dat)
+fit_m8 <- run_or_load_stan("spawner_m8", "./stan/spawners_m8.stan", sp_dat)
+
+
 #model checks####
-worst_Rhat <- summary(fit)$summary %>% 
+worst_Rhat <- summary(fit_m6)$summary %>% 
   as.data.frame() %>% 
   mutate(Rhat = round(Rhat, 3)) %>% 
   arrange(desc(Rhat))
@@ -157,6 +163,36 @@ worst_Rhat %>%
   geom_hline(yintercept = 1.01, lty = 2)+
   geom_vline(xintercept = 400, lty = 2)
 
+loo_m1 <- loo(fit_m1)
+loo_m2 <- loo(fit_m2)
+loo_m3 <- loo(fit_m3)
+loo_m4 <- loo(fit_m4)
+loo_m5 <- loo(fit_m5)
+loo_m6 <- loo(fit_m6)
+loo_m7 <- loo(fit_m7)
+loo_m8 <- loo(fit_m8)
+
+loos <- list(
+  m1 = loo_m1,
+  m2 = loo_m2,
+  m3 = loo_m3,
+  m4 = loo_m4,
+  m5 = loo_m5,
+  m6 = loo_m6,
+  m7 = loo_m7,
+  m8 = loo_m8
+)
+
+cmp <- loo_compare(loos)
+
+loo_df <- as.data.frame(cmp) %>%
+  tibble::rownames_to_column("model") %>%
+  rename(
+    dloo = elpd_diff,
+    se = se_diff
+  )
+
+fit <- fit_m7
 post <- extract(fit)
 ```
 
@@ -215,7 +251,7 @@ If available, counts of newly dead spawners provide further information to estim
 
 ## Model
 
-An annual run of spawners enters a spawning ground with a Gaussian pattern for cumulative entry by day. They reside there for some days of spawning activity. Then spawner exits have the same distribution as entry, but lagged by residence. From this, the number of live spawners present on a survey day ( @fig-enterexit ) is\
+An annual run of spawners enters a spawning ground with a Gaussian pattern for cumulative entry by day. They reside there for some days of spawning activity. Then spawner exits have the same distribution as entry, but lagged by residence. From this, the number of live spawners present on a survey day (@fig-enterexit) is\
 $$
 \begin{aligned}
 \text{live}_\text{true}[t] &= run \ \big( entered - exited) \\
@@ -227,7 +263,7 @@ with $run$: spawner abundance (run size), $t$: survey day of the year, $\mu$: ti
 
 The resulting temporal pattern for number of spawners present is close to a simple Gaussian when $\lambda < 4\sigma$ (exit overlaps entry) but platykurtic (flat-topped) for protracted residence. Additional parameters for skew and kurtosis could be used in the entry and exit pattern.
 
-```{r enterexit, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 6, fig.align= "centre", fig.cap = "The number of spawners present each day is the difference between accumulated entries and accumulated exits. From abundance: 100,000, timing: day 282, spread: 7days, residence: 10 days. Note peak count lags mean timing of entry. The integral of spawners present is the conventional AUC before correction by an assumed value for residence."}
+```{r fig-enterexit, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 6, fig.align= "centre", fig.cap = "Example of how the model estimates total spawner abundance, arrival timing, arrival spread, mean residence, and death spread based on the observed counts (points) of spawners on multiple days. The number of spawners present on a given day is the difference between accumulated arrivals and accumulated deaths. Mean residence time is estimated as a parameter which defines the mean difference in timing of arrivals and death. We assume that spawner counts are imperfect observations of the true number, and so indiviual points vary from the estimated presence value. The total abundance of spawners is estimated as the total number that have arrived. All model parameters are estimated with uncertainty — lines show the posterior median and bands show the 95% credible intervals. In the case of arrived and dead numbers, uncertainty increases with abundance because uncertainty from the timing and spread of arrival or death is multiplied by uncertainty from abundance."}
 j <- 25 # used 2024 as example
 arrived <- sapply(15:max(sp_dat$day), FUN = function(x) {
   pnorm(x, post$arrival[,j], post$arrival_spread[,j]) * exp(post$log_run[,j])
@@ -245,7 +281,7 @@ dead <- sapply(15:max(sp_dat$day), FUN = function(x) {
   mutate(draw = row_number()) %>%
   pivot_longer(-draw, names_to = "day", values_to = "spawners") %>%
   mutate(day = as.integer(gsub("V", "", day))+14) %>% 
-  mutate(type = "newly dead")
+  mutate(type = "dead")
 
 counts <- sapply(15:max(sp_dat$day), FUN = function(x) {
   entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
@@ -280,13 +316,15 @@ residence_df <- data.frame(
 )
 
 ggplot(example_data, aes(x = day + 240, y = spawners, group = type))+
+  geom_ribbon(aes(ymin = l89, ymax = u89), color = NA, alpha = 0.2)+
   geom_textline(size = 4, linewidth = 1, aes(label = type), hjust = 0.65, family = "sans") +
   scale_x_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b ") %>% 
                        paste0(as.integer(format(as.Date(.x, origin = "2023-12-31"), "%d"))),
                      breaks = as.numeric(as.Date(c("2024-09-15", "2024-10-01", "2024-10-15", "2024-11-01", "2024-11-15")) - as.Date("2023-12-31")), 
                      name = "", expand = c(0, 0))+
-  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners (thousands)", expand = expansion(mult = c(0, 0.075)))+
-  geom_textsegment(data = residence_df, aes(x = x_start, xend = x_end, y = y_value, yend = y_value, label = "residence"), linewidth = 0.5, inherit.aes = FALSE, size = 2.8, family = "sans")+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners (thousands)", expand = expansion(mult = c(0, 0)), limits = c(0, 1.3e5))+
+  geom_point(data = index_sk %>% filter(year == 2024), aes(x = yday, y = live, group = NA))+
+    geom_textsegment(data = residence_df, aes(x = x_start, xend = x_end, y = y_value, yend = y_value, label = "residence"), linewidth = 0.5, inherit.aes = FALSE, size = 2.8, family = "sans")+
   annotate("text",
            x = Inf,
            y = max(example_data$spawners),  
@@ -297,14 +335,12 @@ ggplot(example_data, aes(x = day + 240, y = spawners, group = type))+
            family = "sans")+
   theme(panel.grid = element_blank())
 
-
 ```
 
 Counts of newly dead (@fig-newlydead) depend on survey intervals: exits (deaths) cumulative to some survey day, minus exits cumulative to the preceding survey,\
 $$
 \text{dead}_{[t+n]} = run \cdot \phi \cdot \int_{t}^{t+n}\mathcal{N}(t,\mu +\lambda,\sigma) \ \text{d}t
 $$ with $\phi$: the fraction of dead observed, and $t$ and $t+n$: dates for consecutive surveys separated by $n$ days. The first survey of dead spawners in a year observes an accumulation over an unlimited preceding interval; a small number or zero if surveys bracket spawning. The fraction of dead observed $(\phi)$ is likely to change within and between surveys, perhaps from varying flow. We note the potential for bias if $\phi$ varies by type of spawner (age, sex) when dead spawners are the source of biometrics data.
-
 
 The model parameters are further described in the simulation model (Supplementary), including prior distributions and parameters discovered as analysis progressed.
 
@@ -314,16 +350,41 @@ We challenged this model with simulated observations to ensure robust and reliab
 
 ## Stan Models
 
-We used the Stan programming language [@stan] to code series of increasingly complicated series of non-linear, mult-level Bayesian regressions to challenge this model with data. We explored which parameters were important and the trade-off of complication with precision. Our initial fits used explicit and tightly bounded prior PDD (informed priors), and initiated Monte Carlo sampling chains with parameter estimates derived from the data, but this was not necessary, the default procedures successfully initiated sampling chains. See Supplementary Materials for the Stan code that fits these models, plus the R code run it. includes this code, and details regarding convergence and model comparisons.
+We used the Stan programming language [@stan] to code series of increasingly complicated series of non-linear, multi-level Bayesian regressions to challenge this model with data. We explored which parameters were important and the trade-off of complication with precision. Our initial fits used explicit and tightly bounded prior PDD (informed priors), and initiated Monte Carlo sampling chains with parameter estimates derived from the data, but this was not necessary, the default procedures successfully initiated sampling chains. See Supplementary Materials for the Stan code that fits these models, plus the R code run it. includes this code, and details regarding convergence and model comparisons.
 
-The individual models are described in @tbl-models .
+The individual models are described in @fig-modcompare.
 
-```{r}
-#| label: tbl-models
-#| echo: false
-#| tbl-cap: A series of increasingly complicated models were compared.
-a <- read.csv('tables/model_comparisons.csv')
-kable(a)
+```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 7.5, fig.align= "centre", fig.cap= "Model comparison. *Panel A* shows which parameters were held constant (white) versus varied (black) across years in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density (\\(\\Delta\\)ELPD) compared to the model with the highest out-of-sample predictive accuracy (highlighted in red)."}
+
+data.frame(model = c("m1","m2","m3","m4", "m5", "m6","m7", "m8"), 
+           arrival = c("constant", "varies", "varies", "varies", "varies", "varies", "varies", "varies"), 
+           arrival_spread = c("constant", "constant","varies", "constant", "constant", "varies", "varies", "varies"), 
+           death_spread = c("constant", "constant", "constant", "varies", "constant", "constant", "varies", "varies"),
+           residence = c("constant", "constant", "constant", "constant", "varies", "varies", "constant", "varies")) %>%
+  gather(key = parameter, value = value, -model) %>% 
+  ggplot(aes(x = parameter, y = model, fill = value))+
+    geom_tile(color = "grey")+
+  scale_fill_manual(values = c("NA", "black"))+
+  scale_y_discrete(limits = rev)+
+  theme(legend.position = "bottom")+
+  coord_cartesian(expand = FALSE)+
+  theme(panel.grid = element_blank(),
+        axis.ticks = element_blank())+
+
+ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = dloo - se, ymax = dloo + se), width = 0) +
+  coord_flip() +
+  scale_x_discrete(limits = rev)+
+  labs(
+    x = "",
+    y = expression(Delta*ELPD~"(relative to best model)")
+  )+
+  theme(panel.grid.minor.x = element_blank())+
+  scale_color_manual(values = c(1, "red"), guide = "none")+
+  
+  plot_annotation(tag_levels = "A")+
+  plot_layout(widths = c(1, 0.65))
 ```
 
 > outline: describe the different multi-level Stan models (which, why) details of Stan models: how and why: priors, inits, convergence,
@@ -350,7 +411,7 @@ An essential concept in Bayesian statistics is that the data is known but the be
 > Plots\
 > \* example of model with CLs to entry and exit CPDs, observed datapoints, and CLs for predicted curve. Just one year. \* timing, spread, residence by years, with CLs. Fancier the better.
 
-Based on ELPD statistics (@tbl-models) we selected SOMETHING as the best from those explored. Runs, entry_timing, entry_spread, and exit_spread were annual values in groups, with residence, residual, and deadFrac as single values.\
+Based on ELPD statistics (@mod_compare) we selected SOMETHING as the best from those explored. Runs, entry_timing, entry_spread, and exit_spread were annual values in groups, with residence, residual, and deadFrac as single values.\
 
 MORE!
 
@@ -358,7 +419,7 @@ MORE!
 
 From the best model, the annual runs, with 50% and 96% uncertaintly limits are presented as @fig-runs. The fitted PDD for the runs group (by year, logged or not? ) was $\mathcal{N}(\mu= 9.5(sd?), \  \sigma= 1.07(sd?))$ , from which the 95% range, not logged, is 1,850 to 105,000 spawners. The precision of run estimates is approximately $\pm e^{1.07} = 1/3 \text{ to } 3 \times$.
 
-```{r runs, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of total spawning abundance by year (black) compared to the point estimate based on traditional trapezoidal AUC with an assumed 11 day residence (red). Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=4, fig.width=7}
+```{r fig-runs, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of total spawning abundance by year (black) compared to the point estimate based on traditional trapezoidal AUC with an assumed 11 day residence (red). Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=4, fig.width=7}
 spread_draws(fit, log_run[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>% 
   ggplot(aes(x = year, y = exp(log_run)))+
@@ -374,7 +435,7 @@ spread_draws(fit, log_run[year]) %>%
 
 Timing, the mean day of spawner entry but centered using day 300, is distributed $\mathcal{N}(\mu= -6.6,\ \sigma= 2.9)$ with 95% range: solar days 288 to 299, Oct. 5 to Oct. 16. Mean timing was day 293 (Oct. 10), 7 days before the median day from live survey counts. The pattern of annual timing is @fig-timings. Annual precision, as standard deviations, ranged from 1.2 days (2009) to 2.5 days (2020,2022), and was larger in the years without newly dead surveys (2020-2024). Timing in 2010 was an outlier, approximately 10 days $(3\sigma)$ earlier than median timing.
 
-````{r timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of timing, entry_spread, and exit_spread.", fig.align='center', fig.height=8, fig.width=6}
+```{r fig-timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of timing, entry_spread, and exit_spread. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=8, fig.width=6}
 spread_draws(fit, arrival[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>%
   ggplot(aes(x = year, y = arrival + 240))+
@@ -399,7 +460,8 @@ spread_draws(fit, arrival[year]) %>%
   xlab("")+
   
   plot_annotation(tag_levels = "A")
-````
+```
+
 ## Entry spread
 
 The group PDD for entry_spread was estimated as $\mu= 9.5 (\sigma= 0.2)$, implying that 95% of spawners enter within a span of $3.92 \times \mu=37$ days.
@@ -428,7 +490,8 @@ All years as ggplot facets. free y-axis, please. Is it useful to repeat with y-a
 
 The means for the parameters marginal distributions were used to predict each survey's count of live spawners after converting the Stan model to an R function. Predicted and observed are compared in @fig-obsfit. Same again as log-log. Statistics... Outliers...
 
-![Observed survey counts versus means predicted from model #6. REPLACE PLOT](figures/live_predicted_vs_observed.png){#fig-obsfit fig-alt="figures/live_predicted_vs_observed.png" fig-align="center" width="5in"}
+
+
 
 # Discussion
 
@@ -563,11 +626,21 @@ not used
 
 not used
 
-# Supplementary Material {.unnumbered}
+# Supplementary Materials {.appendix}
+
+```{r fig_obsfit, echo = FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=5, fig.width=5.5, fig.cap = "Observed survey counts versus predicted. Points and error bars show the posterior median and the 66% and 95% credible intervals.",}
+spread_draws(fit, live_mu[obs]) %>% 
+  left_join(index_sk %>% mutate(obs = 1:n())) %>% 
+  ggplot(aes(x = live, y = live_mu, group = obs))+
+  geom_abline(slope = 1, intercept = 0)+
+  stat_pointinterval()+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Expected count (thousands)")+
+  scale_x_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Observed count (thousands)")
+```
 
 ![Newly dead spawners each day (blue) is the rate of exits. Newly dead accumulate between surveys, here with alternating 1 day and 4 day separations, leading to an irregular pattern of counts (red). Parameters as in preceding figure.](figures/newly_dead.png){#fig-newlydead fig-align="center" width="4in"}
 
-The following documents are available for public access on [GitHub](https://github.com/Scott-Akenhead/Multilevel-Spawners) and [Zenodo](https://support.zenodo.org/help/en-gb): FIX LINKS
+The following documents are available for public access on [GitHub](https://github.com/SiRE-P/Multilevel-Spawners) and [Zenodo](https://support.zenodo.org/help/en-gb): FIX LINKS
 
 1.  spawners.stan – Stan code for the models
 
