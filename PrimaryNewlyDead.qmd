@@ -361,7 +361,7 @@ We used the Stan programming language [@stan] to code series of increasingly com
 
 The individual models are described in @fig-modcompare.
 
-```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 7.5, fig.align= "centre", fig.cap= "Model summary and comparison. *Panel A* shows which parameters were held constant (white) versus varied (black) across years in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy (highlighted in red)."}
+```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= "centre", fig.cap= "Model summary and comparison. *Panel A* shows which parameters were held constant (white) versus varied (black) across years in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. *Panel C* shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors."}
 
 data.frame(model = c("m1","m2","m3","m4", "m5", "m6","m7", "m8"), 
            arrival = c("constant", "varies", "varies", "varies", "varies", "varies", "varies", "varies"), 
@@ -386,13 +386,25 @@ ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
   scale_x_discrete(limits = rev)+
   labs(
     x = "",
-    y = expression(Delta*ELPD~"(relative to best model)")
+    y = expression(Delta*ELPD~"(rel. to best)")
+  )+
+  theme(panel.grid.minor.x = element_blank())+
+  scale_color_manual(values = c(1, "red"), guide = "none")+
+  
+  ggplot(loo_df, aes(x = model, y = p_loo, color = dloo==0)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = p_loo - se_p_loo, ymax = p_loo  + se_p_loo), width = 0) +
+  coord_flip() +
+  scale_x_discrete(limits = rev)+
+  labs(
+    x = "",
+    y = expression("effective parameters (" * p[loo] * ")")
   )+
   theme(panel.grid.minor.x = element_blank())+
   scale_color_manual(values = c(1, "red"), guide = "none")+
   
   plot_annotation(tag_levels = "A")+
-  plot_layout(widths = c(1, 0.65))
+  plot_layout(widths = c(1, 0.5, 0.5))
 ```
 
 > outline: describe the different multi-level Stan models (which, why) details of Stan models: how and why: priors, inits, convergence,
@@ -402,6 +414,8 @@ ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
 JLT, please. About sampling negative binomial residuals to fit. Compared to lognormal:\
 target \<- normal_lpdf(log_run_predicted\|log_run_predicted, residuals)
 
+Our negative binomial distribution accounts for overdispersion in observed counts as $\mathrm{live}_\phi$, which includes both observation error as well as unmodelled variation in spawner abundance. 
+
 The observed (dependent) variable, $y_{obs}$, is predicted, $y_{pred}$, by a sample of the parameters from the chosen model. An assumed PDD for the residuals, $y_{pred} -y_{obs}$, provides the likelihood of each observation given the model and a sample from its parameters space. There is a prior for the residuals PDD. That likelihood guides subsequent sampling to converge on a "best fit" multivariate PDD for the parameters @gelman2013.
 
 ### Diagnostics
@@ -410,8 +424,6 @@ An essential concept in Bayesian statistics is that the data is known but the be
 
 [^1]: see R package LOO <https://cran.r-project.org/web/packages/loo/loo.pdf> and LOO Package Glossary <https://mc-stan.org/loo/reference/loo-glossary.html>.
 
-> We should also, please, report **p_loo**: the difference between elpd_loo and the non-cross-validated log posterior predictive density. It describes how much more difficult it is to predict future data than the observed data. ... `p_loo` can be interpreted as the *effective number of parameters*. Such as 25 non-independent (similar, well described by group PDD) estimates of entry_timing are effectively 15 (?) parameters. How crazy is that?!
-
 # Results
 
 > outline: Simulations recapture residence. why critical. Tables \* descriptions and fits (ELPD, AIC,) comparison of Stan models\
@@ -419,94 +431,16 @@ An essential concept in Bayesian statistics is that the data is known but the be
 > Plots\
 > \* example of model with CLs to entry and exit CPDs, observed datapoints, and CLs for predicted curve. Just one year. \* timing, spread, residence by years, with CLs. Fancier the better.
 
-Based on ELPD statistics (@mod_compare) we selected model 7 as the best from those explored. This model included year-to-year variation in spawner abundance, arrival timing, arrival spread, and death spread, but assumed that residence time and observation error is constant across years. Model 8, which also allowed residence time to vary across years had an equivalent ELPD ($\Delta$ELPD = `r round(loo_df$dloo[2], 1)`, SE = `r round(loo_df$se[2], 1)`). We have selected the simpler model, for parsemony, but contrast the results from both where appropriate. 
+## Model selection 
+Based on ELPD statistics (@mod_compare B) we selected model 7 as the best from those explored. This model included year-to-year variation in spawner abundance, arrival timing, arrival spread, and death spread, but assumed that residence time and observation error is constant across years. Model 8, which also allowed residence time to vary across years had an equivalent ELPD ($\Delta$ELPD = `r round(loo_df$dloo[2], 1)`, SE = `r round(loo_df$se[2], 1)`). We have selected the simpler model, for parsimony, but contrast the results from both where appropriate.  
 
-MORE!
-
-## Spawning timing
-
-The average arrival day ($\text{arrival}_{\mu}$) across years was estimated to be `r round(median(post$arrival_mu)+day_stand, 1)` (posterior median; 95% CI: `r round(quantile(post$arrival_mu, 0.025)+day_stand, 1)`--`r round(quantile(post$arrival_mu, 0.975)+day_stand, 1)`) which corresponds approximately to `r format(ymd("2025-01-01") + round(median(post$arrival_mu)+day_stand - 1), "%B %e")`. Interannual variation in arrival date ($\text{arrival}_{\sigma}$) was estimated as a standard deviation of `r round(median(post$arrival_sigma), 1)` days. As a result, the median estimated arrival date ranged from `r format(ymd("2025-01-01") + round(min(apply(post$arrival, 2, median))+day_stand - 1), "%B %e")` to `r format(ymd("2025-01-01") + round(max(apply(post$arrival, 2, median))+day_stand - 1), "%B %e")` (@fig-timings A).
-
-The average arrival spread ($e^{\text{arrival_spread}_{\mu}}$) across years was estimated to be `r round(median(exp(post$arrival_spread_mu)), 1)` days (posterior median; 95% CI: `r round(quantile(exp(post$arrival_spread_mu), 0.025), 1)`--`r round(quantile(exp(post$arrival_spread_mu), 0.975), 1)`). Arrival spread varied across years by a multiplicative factor ($e^{\text{arrival_spread}_{\sigma}}$) of `r round(median(exp(post$arrival_spread_sigma)), 1)` As a result, the median estimated arrival spread ranged from `r round(min(apply(post$arrival_spread, 2, median)) - 1)` to `r round(min(apply(post$arrival_spread, 2, max)) - 1)` days (@fig-timings B).
-
-The average death spread ($e^{\text{death_spread}_{\mu}}$) across years was estimated to be `r round(median(exp(post$death_spread_mu)), 1)` days (posterior median; 95% CI: `r round(quantile(exp(post$death_spread_mu), 0.025), 1)`--`r round(quantile(exp(post$death_spread_mu), 0.975), 1)`). Death spread varied across years by a multiplicative factor ($e^{\text{death_spread}_{\sigma}}$) of `r round(median(exp(post$death_spread_sigma)), 1)` As a result, the median estimated death spread ranged from `r round(min(apply(post$death_spread, 2, median)) - 1)` to `r round(min(apply(post$death_spread, 2, max)) - 1)` days (@fig-timings C).
+The effective number of parameters ($\mathrm{p}_{\mathrm{loo}}$) increased when arrival timing variation was introduced (model 1 vs. 2), and also when any of arrival spread, death spread, or residence were allowed to vary (models 3 to 8; @mod_compare C). However, all models with variation in any or all of these parameters (models 3 to 8) had similar numbers of effective parameters. 
 
 
-```{r fig-timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of timing, entry_spread, and exit_spread. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=8, fig.width=6}
-spread_draws(fit, arrival[year]) %>% 
-  mutate(year = year + min(spawners$year)-1) %>%
-  ggplot(aes(x = year, y = arrival + day_stand))+
-  stat_pointinterval()+
-  #scale_y_continuous(breaks = seq(280, 292, by = 3))+
-  #ylab("Mean arrival day")+
-  xlab("")+
-  scale_y_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b %d"), 
-                     breaks = seq(280, 292, by = 3), name = "Mean arrival day")+
-  
-  spread_draws(fit, arrival_spread[year]) %>% 
-  mutate(year = year + min(spawners$year)-1) %>% 
-  ggplot(aes(x = year, y = arrival_spread))+
-  stat_pointinterval()+
-  ylab("Arrival timing sd (days)")+
-  xlab("")+
-  
-  spread_draws(fit, death_spread[year]) %>% 
-  mutate(year = year + min(spawners$year)-1) %>% 
-  ggplot(aes(x = year, y = death_spread))+
-  stat_pointinterval()+
-  plot_layout(ncol = 1)+
-  ylab("Death timing sd (days)")+
-  xlab("")+
-  
-  plot_annotation(tag_levels = "A")
-```
+## Model fit to observed counts  
+Our expected counts correspond well with the observed counts @fig-spawnercurves and @fig-obsfit. Variation between the observed and expected is quantified in our estimate of spawner count overdispersion ($\mathrm{live}_\phi$). The posterior median of ($\mathrm{live}_\phi$) was `r round(median(post$live_phi), 1)` (95% CI: `r round(quantile(post$live_phi, 0.025), 1)`--`r round(quantile(post$live_phi, 0.975), 1)`).
 
-Residence was estimated as `r round(median(post$residence), 1)` days (95% CI; `r round(quantile(post$residence, 0.025), 1)`--`r round(quantile(post$residence, 0.975), 1)`). 
-
-## Entry spread
-
-The group PDD for entry_spread was estimated as $\mu= 9.5 (\sigma= 0.2)$, implying that 95% of spawners enter within a span of $3.92 \times \mu=37$ days.
-
-
-
-SampErr (NAME?) was estimated with $\mu= 1.07 (\sigma= 0.04)$. This is the coefficient of the negative binomial PDD used to describe residuals. This value includes model (process) error as well as observation error.
-
-```{r fig-residence, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distribution of the estimated mean residence time. Points and error bars show the posterior median and the 66% and 95% credible intervals. The vertical dashed line shows the 11 day residence time that has previously been assumed for this system.", fig.align='center', fig.height=4, fig.width=5}
-gather_draws(fit, residence) %>% 
-  ggplot(aes(x = .value))+
-  stat_dist_halfeye()+
-  geom_textvline(data = data.frame(x = 11, label = "previously assumed residence"),lty = 2, aes(xintercept = x, label = label), hjust = 0.9, size = 3)+
-  xlab("Mean residence time")+
-  ylab("Posterior density")+
-  scale_x_continuous(breaks = seq(5, 13, by = 1))+
-  theme(panel.grid = element_blank())+
-  scale_y_continuous(limits = c(0, 1), expand = expansion(c(0.02, 0)))
-```
-
-## Total spawner abundance
-
-From the best model, the annual spawner abundance are presented as @fig-runs. The fitted PDD for the runs group (by year, logged or not? ) was $\mathcal{N}(\mu= 9.5(sd?), \  \sigma= 1.07(sd?))$ , from which the 95% range, not logged, is 1,850 to 105,000 spawners. The precision of run estimates is approximately $\pm e^{1.07} = 1/3 \text{ to } 3 \times$.
-
-```{r fig-runs, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of total spawning abundance by year (black) compared to the point estimate based on traditional trapezoidal AUC with an assumed 11 day residence (red). Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=4, fig.width=7}
-spread_draws(fit, log_run[year]) %>% 
-  mutate(year = year + min(spawners$year)-1) %>% 
-  ggplot(aes(x = year, y = exp(log_run)))+
-  stat_pointinterval(aes(color = "modelled"))+
-  geom_point(data = trad_AUC, aes(x = year, y = nerkids, color = "trad. AUC"))+
-  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawner abundance (thousands)", expand = expansion(mult = c(0, 0)))+
-  coord_cartesian(ylim = c(0, 2.5e5))+
-  scale_color_manual(values = c(1, "red"), "")+
-  xlab("")
-```
-
-
-## Predicted versus Observed
-
-### Time series
-
-Example year if only one.
-
-All years as ggplot facets (@fig-spawnercurves). free y-axis, please. Is it useful to repeat with y-axis as logs? Otherwise it looks like high counts are badly fit, but that is because residual error is assumed similar to sampling error which is proportional (multiplicative, % accuracy). <!--I tried it with free y axis, but that really emphasizes the deviations from the predicted for the high count values. This does the dual job of showing the fit and the year to year variability in total abundance, linking it to the abundance time series figure. I don't think the log fit is necessary. But, if you have strong feelings, I am happy to change.-->
+<!--@Scott - you asked for free-y axis on this figure. I tried this, but that really emphasizes the deviations from the predicted for the high count values. This does the dual job of showing the fit and the year to year variability in total abundance, linking it to the abundance time series figure. I don't think the log fit is necessary. But, if you have strong feelings, I am happy to change.-->
 
 
 ```{r fig-spawnercurves, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Observed versus estimated spawners present over the spawning period in each year (panels). Points show the observed counts, the lines and shaded bands show the posterior median the 95% credible intervals.", fig.align='center', fig.height=8, fig.width=8}
@@ -537,13 +471,99 @@ ggplot(spawn_curves.df, aes(x = day, y = fish))+
   scale_x_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b"), 
                      breaks = as.numeric(as.Date(c("2024-09-01", "2024-10-01", "2024-11-01")) - as.Date("2023-12-31")), name = "")+
     theme(panel.grid.minor = element_blank())
-
   
 ```
 
-### Overall fit
 
-The means for the parameters marginal distributions were used to predict each survey's count of live spawners after converting the Stan model to an R function. Predicted and observed are compared in @fig-obsfit. Same again as log-log. Statistics... Outliers...
+## Spawning timing
+
+The average arrival day ($\mathrm{arrival}_{\mu}$) across years was estimated to be `r round(median(post$arrival_mu)+day_stand, 1)` (posterior median; 95% CI: `r round(quantile(post$arrival_mu, 0.025)+day_stand, 1)`--`r round(quantile(post$arrival_mu, 0.975)+day_stand, 1)`) which corresponds approximately to `r format(ymd("2025-01-01") + round(median(post$arrival_mu)+day_stand - 1), "%B %e")`. Interannual variation in arrival date ($\mathrm{arrival}_{\sigma}$) was estimated as a standard deviation of `r round(median(post$arrival_sigma), 1)` days. As a result, the median estimated arrival date ranged from `r format(ymd("2025-01-01") + round(min(apply(post$arrival, 2, median))+day_stand - 1), "%B %e")` to `r format(ymd("2025-01-01") + round(max(apply(post$arrival, 2, median))+day_stand - 1), "%B %e")` (@fig-timings A).
+
+The average arrival spread ($e^{\mathrm{arrival\_spread}_\mu}$) across years was estimated to be `r round(median(exp(post$arrival_spread_mu)), 1)` days (posterior median; 95% CI: `r round(quantile(exp(post$arrival_spread_mu), 0.025), 1)`--`r round(quantile(exp(post$arrival_spread_mu), 0.975), 1)`). This implies that 95% of spawners enter within a span of `r round(3.92 * median(exp(post$arrival_spread_mu)), 1)` days. Arrival spread varied across years by a multiplicative factor ($e^{\mathrm{arrival\_spread}_\sigma}$) of `r round(median(exp(post$arrival_spread_sigma)), 1)`. As a result, the median estimated arrival spread ranged from `r round(min(apply(post$arrival_spread, 2, median)) - 1)` to `r round(min(apply(post$arrival_spread, 2, max)) - 1)` days (@fig-timings B).
+
+The average death spread ($e^{\mathrm{death\_spread}_{\mu}}$) across years was estimated to be `r round(median(exp(post$death_spread_mu)), 1)` days (posterior median; 95% CI: `r round(quantile(exp(post$death_spread_mu), 0.025), 1)`--`r round(quantile(exp(post$death_spread_mu), 0.975), 1)`). Death spread varied across years by a multiplicative factor ($e^{\mathrm{death\_spread}_{\sigma}}$) of `r round(median(exp(post$death_spread_sigma)), 1)` As a result, the median estimated death spread ranged from `r round(min(apply(post$death_spread, 2, median)) - 1)` to `r round(min(apply(post$death_spread, 2, max)) - 1)` days (@fig-timings C).
+
+
+```{r fig-timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of timing, entry_spread, and exit_spread. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=7, fig.width=6}
+spread_draws(fit, arrival[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>%
+  ggplot(aes(x = year, y = arrival + day_stand))+
+  stat_pointinterval()+
+  #scale_y_continuous(breaks = seq(280, 292, by = 3))+
+  #ylab("Mean arrival day")+
+  xlab("")+
+  scale_y_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b %d"), 
+                     breaks = seq(280, 292, by = 3), name = "Mean arrival day")+
+  
+  spread_draws(fit, arrival_spread[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>% 
+  ggplot(aes(x = year, y = arrival_spread))+
+  stat_pointinterval()+
+  ylab("Arrival timing sd (days)")+
+  xlab("")+
+  
+  spread_draws(fit, death_spread[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>% 
+  ggplot(aes(x = year, y = death_spread))+
+  stat_pointinterval()+
+  plot_layout(ncol = 1)+
+  ylab("Death timing sd (days)")+
+  xlab("")+
+  
+  plot_annotation(tag_levels = "A")
+```
+
+Residence was estimated as `r round(median(post$residence), 1)` days (95% CI; `r round(quantile(post$residence, 0.025), 1)`--`r round(quantile(post$residence, 0.975), 1)`; @fig-residence). 
+
+```{r fig-residence, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distribution of the estimated mean residence time. Points and error bars show the posterior median and the 66% and 95% credible intervals. The vertical dashed line shows the 11 day residence time that has previously been assumed for this system.", fig.align='center', fig.height=4, fig.width=5}
+gather_draws(fit, residence) %>% 
+  ggplot(aes(x = .value))+
+  stat_dist_halfeye()+
+  geom_textvline(data = data.frame(x = 11, label = "previously assumed residence"),lty = 2, aes(xintercept = x, label = label), hjust = 0.9, size = 3)+
+  xlab("Mean residence time")+
+  ylab("Posterior density")+
+  scale_x_continuous(breaks = seq(5, 13, by = 1))+
+  theme(panel.grid = element_blank())+
+  scale_y_continuous(limits = c(0, 1), expand = expansion(c(0.02, 0)))
+```
+
+## Total spawner abundance
+```{r AUCvsmodel, include = FALSE}
+
+run_intervals <- spread_draws(fit, log_run[year]) %>%
+  mutate(year = year + min(spawners$year) - 1) %>%
+  mutate(run = exp(log_run)) %>%
+  group_by(year) %>%
+  summarise(lower = quantile(run, 0.17),
+            upper = quantile(run, 0.83),
+            median = median(run))
+
+AUC_in_66 <- trad_AUC %>%
+  left_join(run_intervals, by = "year") %>%
+  mutate(in_66 = nerkids > lower & nerkids < upper, 
+         lower =  median > nerkids) 
+  
+```
+Estimated posterior median annual spawner abundances vary from as low as `r round(min(apply(exp(post$log_run), 2, median)))` in `r which(apply(exp(post$log_run), 2, median) == min(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1` to as high as `r round(max(apply(exp(post$log_run), 2, median)))` in `r which(apply(exp(post$log_run), 2, median) == max(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1`. Since 2008, spawner abundance has alternated between low and high levels in a two-year cycle. The posterior estimate from our method is, on average, higher than the AUC estimate ()
+
+in `r sum(AUC_in_66$lower)`% of the `r nrow(AUC_in_66)` years.  
+
+The traditional trapezoidal AUC, with an assumed 11 day residence time, estimate falls within the 66% credible interval of our model prediction in all years. 
+
+```{r fig-runs, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of total spawning abundance by year (black) compared to the point estimate based on traditional trapezoidal AUC with an assumed 11 day residence (red). Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=4, fig.width=7}
+spread_draws(fit, log_run[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>% 
+  ggplot(aes(x = year, y = exp(log_run)))+
+  stat_pointinterval(aes(color = "modelled"))+
+  geom_point(data = trad_AUC, aes(x = year, y = nerkids, color = "trad. AUC"))+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawner abundance (thousands)", expand = expansion(mult = c(0, 0)))+
+  coord_cartesian(ylim = c(0, 2.5e5))+
+  scale_color_manual(values = c(1, "red"), "")+
+  xlab("")
+```
+
+
+
 
 
 
