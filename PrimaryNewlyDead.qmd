@@ -37,15 +37,18 @@ keywords:
   - Osoyoos Lake
   - Okanagan River
   - Columbia River 
-appendix: true
+
 format:
   elsevier-pdf:
-    keep-tex: true
+    keep-tex: false
+    number-sections: true
     journal:
       name: Fisheries Research
       formatting: preprint
       # model: 3p # Don't set a model with preprint
       cite-style: authoryear
+appendix: true
+
 ---
 
 ```{r setup, include = FALSE}
@@ -108,8 +111,10 @@ trad_AUC <- index_sk %>%
 ```
 
 ```{r stan, include = FALSE}
+day_stand <- min(index_sk$yday)
+
 priors <- data.frame(prior = c("log_runs_mu", "arrival_mu", "arrival_sigma", "spread","spread_sigma","residence", "count_dispersion"),
-                     v1 = c(10,280-240, 0,log(8-1), 0,log(11-1), 1), 
+                     v1 = c(10,280-day_stand, 0,log(8-1), 0,log(11-1), 1), 
                      v2 = c(1,5,2,0.2, 10, 0.3, 0.2))
 
 
@@ -117,7 +122,7 @@ sp_dat = list(n_priors = nrow(priors),
               priors = data.matrix(priors[,-1]),
               n_years = max(index_sk$year_ind),
               year = as.numeric(factor(index_sk$year)),
-              day = index_sk$yday-240,
+              day = index_sk$yday-day_stand,
               n_obs = nrow(index_sk),
               live_counts = index_sk$live)
 
@@ -151,7 +156,7 @@ fit_m8 <- run_or_load_stan("spawner_m8", "./stan/spawners_m8.stan", sp_dat)
 
 
 #model checks####
-worst_Rhat <- summary(fit_m6)$summary %>% 
+worst_Rhat <- summary(fit_m7)$summary %>% 
   as.data.frame() %>% 
   mutate(Rhat = round(Rhat, 3)) %>% 
   arrange(desc(Rhat))
@@ -193,7 +198,7 @@ loo_df <- as.data.frame(cmp) %>%
   )
 
 fit <- fit_m7
-post <- extract(fit)
+post <- rstan::extract(fit)
 ```
 
 # Introduction
@@ -223,11 +228,13 @@ Our analysis was confined to the population of wild Sockeye Salmon that spawn in
 
 After one to three years (rarely more) of marine growth, adults return to the Columbia River in late summer and attempt the transit of ten dams in a 950 km freshwater migration, before entering Osoyoos Lake and subsequently spawning yet further upstream. Ascending the Okanagan River from the Columbia River is increasingly compromised by high river temperatures [@isaak2011; @hyatt2020; @bailey2023; @martins2012; @major1967; @quinn1996].
 
+Spawner estimates for Osoyoos sockeye have historically been based on trapezoidal AUC, with an assumed residence time of 11 days [@hyatt2010]. However, residence time was never assessed for this population directly. Therefore, the selected residence time was based on the estimate for the early Stuart sockeye stock [@perrin1990] because that stock has similar average body size, migration distance, and migratory timing [@hyatt2010]. <!-- cite as - Hyatt, Kim , Margot Stockwell, Howie Wright, Lynnea Wiens and Paul Askey. 2010. Okanagan Fish and Water Management Tools Project Assessments: Brood Year 2009 Salmon (Oncorhynchus nerka) Abundance and Biological Traits.  Report to file: JSIDS- SRe10-10. Salmon in Regional Ecosystems Program, Fisheries and Oceans Canada, Nanaimo, B.C.  V9T 6N7. 28 p.-->
+
 ![The spawning grounds for Sockeye Salmon population that rear as parr in the North Basin of Osoyoos Lake are \~20 to 30 km upstream, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. Parr are predominantly in the North Basin. River flows that affect spawners, eggs, and parr are monitored by Environment Canada (EC) at the site indicated. Map by Braden Judson, Pacific Biological Station.](figures/Okanagan_to_Osoyoo_Lakes.png){#fig-map fig-align="center" width="5in"}
 
 # Data
 
-Surveys of live and newly dead spawner were conducted with a consistent method 2000-2024, with 9 to 19 surveys per year spanning Julian days 240 to 328.
+Surveys of live spawners have been conducted in the main sockeye spawning area---also known as the index section---of the Okanagan river between Osoyoos and Vasseau lakes (@fig-map) since `r min(index_sk$year)`. All together, surveys have been conducted on `r nrow(index_sk)` days, ranging between `r min(table(index_sk$year))` and `r max(table(index_sk$year))` surveys per year. All surveys occurred between `r format(min(update(index_sk$date, year = 2000)), "%B %e")` and `r format(max(update(index_sk$date, year = 2000)), "%B %e")`.
 
 ### Survey methods
 
@@ -304,8 +311,8 @@ example_data <- bind_rows(arrived, dead, counts) %>%
 mean_arrival_day <- median(post$arrival[,j])
 median_residence <- median(post$residence)
 y_value <- median(pnorm(mean_arrival_day, post$arrival[,j], post$arrival_spread[,j]) * exp(post$log_run[,j]))
-x_start <- mean_arrival_day + 240
-x_end <- mean_arrival_day + median_residence + 240
+x_start <- mean_arrival_day + day_stand
+x_end <- mean_arrival_day + median_residence + day_stand
 
 residence_df <- data.frame(
   x = x_start,
@@ -315,7 +322,7 @@ residence_df <- data.frame(
   label = "residence"
 )
 
-ggplot(example_data, aes(x = day + 240, y = spawners, group = type))+
+ggplot(example_data, aes(x = day + day_stand, y = spawners, group = type))+
   geom_ribbon(aes(ymin = l89, ymax = u89), color = NA, alpha = 0.2)+
   geom_textline(size = 4, linewidth = 1, aes(label = type), hjust = 0.65, family = "sans") +
   scale_x_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b ") %>% 
@@ -354,7 +361,7 @@ We used the Stan programming language [@stan] to code series of increasingly com
 
 The individual models are described in @fig-modcompare.
 
-```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 7.5, fig.align= "centre", fig.cap= "Model comparison. *Panel A* shows which parameters were held constant (white) versus varied (black) across years in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density (\\(\\Delta\\)ELPD) compared to the model with the highest out-of-sample predictive accuracy (highlighted in red)."}
+```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 7.5, fig.align= "centre", fig.cap= "Model summary and comparison. *Panel A* shows which parameters were held constant (white) versus varied (black) across years in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy (highlighted in red)."}
 
 data.frame(model = c("m1","m2","m3","m4", "m5", "m6","m7", "m8"), 
            arrival = c("constant", "varies", "varies", "varies", "varies", "varies", "varies", "varies"), 
@@ -370,6 +377,7 @@ data.frame(model = c("m1","m2","m3","m4", "m5", "m6","m7", "m8"),
   coord_cartesian(expand = FALSE)+
   theme(panel.grid = element_blank(),
         axis.ticks = element_blank())+
+  labs(x = "Parameter", y = "Model")+
 
 ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
   geom_point(size = 2) +
@@ -411,38 +419,29 @@ An essential concept in Bayesian statistics is that the data is known but the be
 > Plots\
 > \* example of model with CLs to entry and exit CPDs, observed datapoints, and CLs for predicted curve. Just one year. \* timing, spread, residence by years, with CLs. Fancier the better.
 
-Based on ELPD statistics (@mod_compare) we selected SOMETHING as the best from those explored. Runs, entry_timing, entry_spread, and exit_spread were annual values in groups, with residence, residual, and deadFrac as single values.\
+Based on ELPD statistics (@mod_compare) we selected model 7 as the best from those explored. This model included year-to-year variation in spawner abundance, arrival timing, arrival spread, and death spread, but assumed that residence time and observation error is constant across years. Model 8, which also allowed residence time to vary across years had an equivalent ELPD ($\Delta$ELPD = `r round(loo_df$dloo[2], 1)`, SE = `r round(loo_df$se[2], 1)`). We have selected the simpler model, for parsemony, but contrast the results from both where appropriate. 
 
 MORE!
 
-## Runs
+## Spawning timing
 
-From the best model, the annual runs, with 50% and 96% uncertaintly limits are presented as @fig-runs. The fitted PDD for the runs group (by year, logged or not? ) was $\mathcal{N}(\mu= 9.5(sd?), \  \sigma= 1.07(sd?))$ , from which the 95% range, not logged, is 1,850 to 105,000 spawners. The precision of run estimates is approximately $\pm e^{1.07} = 1/3 \text{ to } 3 \times$.
+The average arrival day ($\text{arrival}_{\mu}$) across years was estimated to be `r round(median(post$arrival_mu)+day_stand, 1)` (posterior median; 95% CI: `r round(quantile(post$arrival_mu, 0.025)+day_stand, 1)`--`r round(quantile(post$arrival_mu, 0.975)+day_stand, 1)`) which corresponds approximately to `r format(ymd("2025-01-01") + round(median(post$arrival_mu)+day_stand - 1), "%B %e")`. Interannual variation in arrival date ($\text{arrival}_{\sigma}$) was estimated as a standard deviation of `r round(median(post$arrival_sigma), 1)` days. As a result, the median estimated arrival date ranged from `r format(ymd("2025-01-01") + round(min(apply(post$arrival, 2, median))+day_stand - 1), "%B %e")` to `r format(ymd("2025-01-01") + round(max(apply(post$arrival, 2, median))+day_stand - 1), "%B %e")` (@fig-timings A).
 
-```{r fig-runs, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of total spawning abundance by year (black) compared to the point estimate based on traditional trapezoidal AUC with an assumed 11 day residence (red). Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=4, fig.width=7}
-spread_draws(fit, log_run[year]) %>% 
-  mutate(year = year + min(spawners$year)-1) %>% 
-  ggplot(aes(x = year, y = exp(log_run)))+
-  stat_pointinterval(aes(color = "modelled"))+
-  geom_point(data = trad_AUC, aes(x = year, y = nerkids, color = "trad. AUC"))+
-  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawner abundance (thousands)", expand = expansion(mult = c(0, 0)))+
-  coord_cartesian(ylim = c(0, 2.5e5))+
-  scale_color_manual(values = c(1, "red"), "")+
-  xlab("")
-```
+The average arrival spread ($e^{\text{arrival_spread}_{\mu}}$) across years was estimated to be `r round(median(exp(post$arrival_spread_mu)), 1)` days (posterior median; 95% CI: `r round(quantile(exp(post$arrival_spread_mu), 0.025), 1)`--`r round(quantile(exp(post$arrival_spread_mu), 0.975), 1)`). Arrival spread varied across years by a multiplicative factor ($e^{\text{arrival_spread}_{\sigma}}$) of `r round(median(exp(post$arrival_spread_sigma)), 1)` As a result, the median estimated arrival spread ranged from `r round(min(apply(post$arrival_spread, 2, median)) - 1)` to `r round(min(apply(post$arrival_spread, 2, max)) - 1)` days (@fig-timings B).
 
-## Timing
+The average death spread ($e^{\text{death_spread}_{\mu}}$) across years was estimated to be `r round(median(exp(post$death_spread_mu)), 1)` days (posterior median; 95% CI: `r round(quantile(exp(post$death_spread_mu), 0.025), 1)`--`r round(quantile(exp(post$death_spread_mu), 0.975), 1)`). Death spread varied across years by a multiplicative factor ($e^{\text{death_spread}_{\sigma}}$) of `r round(median(exp(post$death_spread_sigma)), 1)` As a result, the median estimated death spread ranged from `r round(min(apply(post$death_spread, 2, median)) - 1)` to `r round(min(apply(post$death_spread, 2, max)) - 1)` days (@fig-timings C).
 
-Timing, the mean day of spawner entry but centered using day 300, is distributed $\mathcal{N}(\mu= -6.6,\ \sigma= 2.9)$ with 95% range: solar days 288 to 299, Oct. 5 to Oct. 16. Mean timing was day 293 (Oct. 10), 7 days before the median day from live survey counts. The pattern of annual timing is @fig-timings. Annual precision, as standard deviations, ranged from 1.2 days (2009) to 2.5 days (2020,2022), and was larger in the years without newly dead surveys (2020-2024). Timing in 2010 was an outlier, approximately 10 days $(3\sigma)$ earlier than median timing.
 
 ```{r fig-timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of timing, entry_spread, and exit_spread. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=8, fig.width=6}
 spread_draws(fit, arrival[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>%
-  ggplot(aes(x = year, y = arrival + 240))+
+  ggplot(aes(x = year, y = arrival + day_stand))+
   stat_pointinterval()+
-  scale_y_continuous(breaks = seq(280, 292, by = 3))+
-  ylab("Mean arrival day")+
+  #scale_y_continuous(breaks = seq(280, 292, by = 3))+
+  #ylab("Mean arrival day")+
   xlab("")+
+  scale_y_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b %d"), 
+                     breaks = seq(280, 292, by = 3), name = "Mean arrival day")+
   
   spread_draws(fit, arrival_spread[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>% 
@@ -462,21 +461,44 @@ spread_draws(fit, arrival[year]) %>%
   plot_annotation(tag_levels = "A")
 ```
 
+Residence was estimated as `r round(median(post$residence), 1)` days (95% CI; `r round(quantile(post$residence, 0.025), 1)`--`r round(quantile(post$residence, 0.975), 1)`). 
+
 ## Entry spread
 
 The group PDD for entry_spread was estimated as $\mu= 9.5 (\sigma= 0.2)$, implying that 95% of spawners enter within a span of $3.92 \times \mu=37$ days.
 
-## Exit spread
 
-asdf
-
-## Fixed parameters
-
-Residence was estimated as $\mu= 0.0 (\sigma= 0.0)$ days, similar to the conventional estimate of 11 days REFERENCE.
-
-DeadFrac was estimated as $\mu= 0.65 (\sigma = 0.10)$, implying that, on average, 65% of newly dead spawners are observed. How this varies between years and between surveys, from varying flows and biometrics, remains to be determined.
 
 SampErr (NAME?) was estimated with $\mu= 1.07 (\sigma= 0.04)$. This is the coefficient of the negative binomial PDD used to describe residuals. This value includes model (process) error as well as observation error.
+
+```{r fig-residence, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distribution of the estimated mean residence time. Points and error bars show the posterior median and the 66% and 95% credible intervals. The vertical dashed line shows the 11 day residence time that has previously been assumed for this system.", fig.align='center', fig.height=4, fig.width=5}
+gather_draws(fit, residence) %>% 
+  ggplot(aes(x = .value))+
+  stat_dist_halfeye()+
+  geom_textvline(data = data.frame(x = 11, label = "previously assumed residence"),lty = 2, aes(xintercept = x, label = label), hjust = 0.9, size = 3)+
+  xlab("Mean residence time")+
+  ylab("Posterior density")+
+  scale_x_continuous(breaks = seq(5, 13, by = 1))+
+  theme(panel.grid = element_blank())+
+  scale_y_continuous(limits = c(0, 1), expand = expansion(c(0.02, 0)))
+```
+
+## Total spawner abundance
+
+From the best model, the annual spawner abundance are presented as @fig-runs. The fitted PDD for the runs group (by year, logged or not? ) was $\mathcal{N}(\mu= 9.5(sd?), \  \sigma= 1.07(sd?))$ , from which the 95% range, not logged, is 1,850 to 105,000 spawners. The precision of run estimates is approximately $\pm e^{1.07} = 1/3 \text{ to } 3 \times$.
+
+```{r fig-runs, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of total spawning abundance by year (black) compared to the point estimate based on traditional trapezoidal AUC with an assumed 11 day residence (red). Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=4, fig.width=7}
+spread_draws(fit, log_run[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>% 
+  ggplot(aes(x = year, y = exp(log_run)))+
+  stat_pointinterval(aes(color = "modelled"))+
+  geom_point(data = trad_AUC, aes(x = year, y = nerkids, color = "trad. AUC"))+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawner abundance (thousands)", expand = expansion(mult = c(0, 0)))+
+  coord_cartesian(ylim = c(0, 2.5e5))+
+  scale_color_manual(values = c(1, "red"), "")+
+  xlab("")
+```
+
 
 ## Predicted versus Observed
 
@@ -484,7 +506,40 @@ SampErr (NAME?) was estimated with $\mu= 1.07 (\sigma= 0.04)$. This is the coeff
 
 Example year if only one.
 
-All years as ggplot facets. free y-axis, please. Is it useful to repeat with y-axis as logs? Otherwise it looks like high counts are badly fit, but that is because residual error is assumed similar to sampling error which is proportional (multiplicative, % accuracy).
+All years as ggplot facets (@fig-spawnercurves). free y-axis, please. Is it useful to repeat with y-axis as logs? Otherwise it looks like high counts are badly fit, but that is because residual error is assumed similar to sampling error which is proportional (multiplicative, % accuracy). <!--I tried it with free y axis, but that really emphasizes the deviations from the predicted for the high count values. This does the dual job of showing the fit and the year to year variability in total abundance, linking it to the abundance time series figure. I don't think the log fit is necessary. But, if you have strong feelings, I am happy to change.-->
+
+
+```{r fig-spawnercurves, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Observed versus estimated spawners present over the spawning period in each year (panels). Points show the observed counts, the lines and shaded bands show the posterior median the 95% credible intervals.", fig.align='center', fig.height=8, fig.width=8}
+spawn_curves.df <- data.frame()
+for(j in 1:ncol(post$log_run)){
+  live <- sapply(1:max(sp_dat$day), FUN = function(x) {
+    entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
+    exited <- pnorm(x, post$arrival[,j] + post$residence, post$death_spread[,j])
+    
+    exp(post$log_run[,j] + log(entered - (entered * exited)))
+  })
+  
+  spawn_curves.df <- bind_rows(spawn_curves.df, data.frame(year = j + min(spawners$year)-1, 
+                                                           day = 1:max(sp_dat$day)+day_stand,
+                                                           fish = apply(live, 2, median),
+                                                           l95 = apply(live, 2, quantile, probs = 0.025),
+                                                           u95 = apply(live, 2, quantile, probs = 0.975)))
+}
+
+
+ggplot(spawn_curves.df, aes(x = day, y = fish))+
+  geom_line()+
+  geom_ribbon(aes(ymin = l95, ymax = u95), color = NA, alpha = 0.2)+
+  facet_wrap(~year)+
+  geom_point(data = index_sk, aes(x = yday, y = live), size = 0.8)+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners present (thousands)", expand = expansion(mult = c(0, 0.02)))+
+  theme(strip.background = element_rect(color="NA", fill="NA"))+
+  scale_x_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b"), 
+                     breaks = as.numeric(as.Date(c("2024-09-01", "2024-10-01", "2024-11-01")) - as.Date("2023-12-31")), name = "")+
+    theme(panel.grid.minor = element_blank())
+
+  
+```
 
 ### Overall fit
 
@@ -503,13 +558,13 @@ The means for the parameters marginal distributions were used to predict each su
 
 ## Residence and exit spread.
 
-The attempt to estimate residence directly from spawner surveys was successful. For this species and place, the estimate was ?? days (\$\sigma = ??). This is approximately twice the spread of entry, implying nearly half of the spawners enter before newly-dead are abundant. Our estimate is similar to the value (11 days) previously used to correct for AUC, but we identified annual variability in exit spread that is related to changes in residence. Our interpretation is that residence time is a function of date of entry, likely because early entrants stay longer than late entrants, a pattern identified by REFERENCES and ascribed to age and sex. Residence as a linear function of entry changes exit spread compared to entry spread:
+The attempt to estimate residence directly from spawner surveys was successful. For this species and place, the estimate was ?? days (\$\sigma = ??). This is approximately twice the spread of entry, implying nearly half of the spawners enter before newly-dead are abundant. Our estimate suggests that residence time is likelu lower than the value (11 days) previously used to correct for AUC [@hyatt2010], which sits at the `r round(ecdf(post$residence)(11)* 100)`$^th$ percentile of our distribution. Furthermore, we identified annual variability in exit spread that is related to changes in residence. Our interpretation is that residence time is a function of date of entry, likely because early entrants stay longer than late entrants, a pattern identified by REFERENCES and ascribed to age and sex. Residence as a linear function of entry changes exit spread compared to entry spread:
 
 $$
 \mathcal{N}(x,\mu,\sigma) + (a+bx) = \mathcal{N}(x,\mu+a,b\sigma)
 $$
 
-where $a$ is the mean residence time (constant, about 11 days), and $b \text{ where } \ (0 <b<1)$ describes how much the exit spread shrinks from entry spread. If entry spread = 5 days and $b=0.8$ then exit spread = 4. We determined exit spread directly rather than determining $b$ because the the underlying ecology will be more complicated than a single, linear, parameter. Inspection of @fig-timings reveals exit spread is not correlated with entry spread, but does share a common temporal trend with entry timing (recently later and longer). That exit spread varies is an intriguing discovery awaiting explanation.
+where $a$ is the mean residence time (constant), and $b \text{ where } \ (0 <b<1)$ describes how much the exit spread shrinks from entry spread. If entry spread = 5 days and $b=0.8$ then exit spread = 4. We determined exit spread directly rather than determining $b$ because the the underlying ecology will be more complicated than a single, linear, parameter. Inspection of @fig-timings reveals exit spread is not correlated with entry spread, but does share a common temporal trend with entry timing (recently later and longer). That exit spread varies is an intriguing discovery awaiting explanation.
 
 ## Annual run size
 
@@ -628,7 +683,47 @@ not used
 
 # Supplementary Materials {.appendix}
 
-```{r fig_obsfit, echo = FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=5, fig.width=5.5, fig.cap = "Observed survey counts versus predicted. Points and error bars show the posterior median and the 66% and 95% credible intervals.",}
+```{=latex}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\setcounter{figure}{0}
+```
+
+```{r fig-timingsalt, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of timing, entry_spread, exit_spread, and residence from the alternative model that also includes year-to-year variation in residence. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=10, fig.width=6}
+spread_draws(fit_m8, arrival[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>%
+  ggplot(aes(x = year, y = arrival + day_stand))+
+  stat_pointinterval()+
+  scale_y_continuous(breaks = seq(280, 292, by = 3))+
+  ylab("Mean arrival day")+
+  xlab("")+
+  
+  spread_draws(fit_m8, arrival_spread[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>% 
+  ggplot(aes(x = year, y = arrival_spread))+
+  stat_pointinterval()+
+  ylab("Arrival timing sd (days)")+
+  xlab("")+
+  
+  spread_draws(fit_m8, death_spread[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>% 
+  ggplot(aes(x = year, y = death_spread))+
+  stat_pointinterval()+
+  plot_layout(ncol = 1)+
+  ylab("Death timing sd (days)")+
+  xlab("")+
+  
+  spread_draws(fit_m8, residence[year]) %>% 
+  mutate(year = year + min(spawners$year)-1) %>% 
+  ggplot(aes(x = year, y = residence))+
+  stat_pointinterval()+
+  plot_layout(ncol = 1)+
+  ylab("Residence (days)")+
+  xlab("")+
+  
+  plot_annotation(tag_levels = "A")
+```
+
+```{r fig-obsfit, echo = FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=5, fig.width=5.5, fig.cap = "Observed survey counts versus predicted. Points and error bars show the posterior median and the 66% and 95% credible intervals.",}
 spread_draws(fit, live_mu[obs]) %>% 
   left_join(index_sk %>% mutate(obs = 1:n())) %>% 
   ggplot(aes(x = live, y = live_mu, group = obs))+
@@ -639,6 +734,8 @@ spread_draws(fit, live_mu[obs]) %>%
 ```
 
 ![Newly dead spawners each day (blue) is the rate of exits. Newly dead accumulate between surveys, here with alternating 1 day and 4 day separations, leading to an irregular pattern of counts (red). Parameters as in preceding figure.](figures/newly_dead.png){#fig-newlydead fig-align="center" width="4in"}
+
+
 
 The following documents are available for public access on [GitHub](https://github.com/SiRE-P/Multilevel-Spawners) and [Zenodo](https://support.zenodo.org/help/en-gb): FIX LINKS
 
