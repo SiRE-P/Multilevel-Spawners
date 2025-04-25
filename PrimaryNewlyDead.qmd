@@ -168,6 +168,18 @@ worst_Rhat %>%
   geom_hline(yintercept = 1.01, lty = 2)+
   geom_vline(xintercept = 400, lty = 2)
 
+worst_Rhat8 <- summary(fit_m8)$summary %>% 
+  as.data.frame() %>% 
+  mutate(Rhat = round(Rhat, 3)) %>% 
+  arrange(desc(Rhat))
+
+worst_Rhat8 %>% 
+  filter(n_eff>3) %>% 
+  ggplot(aes(x = n_eff, y = Rhat))+
+  geom_point()+
+  geom_hline(yintercept = 1.01, lty = 2)+
+  geom_vline(xintercept = 400, lty = 2)
+
 loo_m1 <- loo(fit_m1)
 loo_m2 <- loo(fit_m2)
 loo_m3 <- loo(fit_m3)
@@ -199,6 +211,7 @@ loo_df <- as.data.frame(cmp) %>%
 
 fit <- fit_m7
 post <- rstan::extract(fit)
+post8 <- rstan::extract(fit_m8)
 ```
 
 # Introduction
@@ -270,7 +283,7 @@ with $run$: spawner abundance (run size), $t$: survey day of the year, $\mu$: ti
 
 The resulting temporal pattern for number of spawners present is close to a simple Gaussian when $\lambda < 4\sigma$ (exit overlaps entry) but platykurtic (flat-topped) for protracted residence. Additional parameters for skew and kurtosis could be used in the entry and exit pattern.
 
-```{r fig-enterexit, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 6, fig.align= "centre", fig.cap = "Example of how the model estimates total spawner abundance, arrival timing, arrival spread, mean residence, and death spread based on the observed counts (points) of spawners on multiple days. The number of spawners present on a given day is the difference between accumulated arrivals and accumulated deaths. Mean residence time is estimated as a parameter which defines the mean difference in timing of arrivals and death. We assume that spawner counts are imperfect observations of the true number, and so indiviual points vary from the estimated presence value. The total abundance of spawners is estimated as the total number that have arrived. All model parameters are estimated with uncertainty — lines show the posterior median and bands show the 95% credible intervals. In the case of arrived and dead numbers, uncertainty increases with abundance because uncertainty from the timing and spread of arrival or death is multiplied by uncertainty from abundance."}
+```{r fig-enterexit, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 6, fig.align= 'center', fig.cap = "Example of how the model estimates total spawner abundance, arrival timing, arrival spread, mean residence, and death spread based on the observed counts (points) of spawners on multiple days. The number of spawners present on a given day is the difference between accumulated arrivals and accumulated deaths. Mean residence time is estimated as a parameter which defines the mean difference in timing of arrivals and death. We assume that spawner counts are imperfect observations of the true number, and so indiviual points vary from the estimated presence value. The total abundance of spawners is estimated as the total number that have arrived. All model parameters are estimated with uncertainty — lines show the posterior median and bands show the 95% credible intervals. In the case of arrived and dead numbers, uncertainty increases with abundance because uncertainty from the timing and spread of arrival or death is multiplied by uncertainty from abundance."}
 j <- 25 # used 2024 as example
 arrived <- sapply(15:max(sp_dat$day), FUN = function(x) {
   pnorm(x, post$arrival[,j], post$arrival_spread[,j]) * exp(post$log_run[,j])
@@ -359,9 +372,40 @@ We challenged this model with simulated observations to ensure robust and reliab
 
 We used the Stan programming language [@stan] to code series of increasingly complicated series of non-linear, multi-level Bayesian regressions to challenge this model with data. We explored which parameters were important and the trade-off of complication with precision. Our initial fits used explicit and tightly bounded prior PDD (informed priors), and initiated Monte Carlo sampling chains with parameter estimates derived from the data, but this was not necessary, the default procedures successfully initiated sampling chains. See Supplementary Materials for the Stan code that fits these models, plus the R code run it. includes this code, and details regarding convergence and model comparisons.
 
-The individual models are described in @fig-modcompare.
+Differences between the models are summarised in @fig-modcompare A.
 
-```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= "centre", fig.cap= "Model summary and comparison. *Panel A* shows which parameters were held constant (white) versus varied (black) across years in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. *Panel C* shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors."}
+> outline: describe the different multi-level Stan models (which, why) details of Stan models: how and why: priors, inits, convergence,
+
+### Likelihood Model
+
+JLT, please. About sampling negative binomial residuals to fit. Compared to lognormal:\
+target \<- normal_lpdf(log_run_predicted\|log_run_predicted, residuals)
+
+Our negative binomial distribution accounts for overdispersion in observed counts as $\mathrm{live}_\phi$, which includes both observation error as well as unmodelled variation in spawner abundance. 
+
+The observed (dependent) variable, $y_{obs}$, is predicted, $y_{pred}$, by a sample of the parameters from the chosen model. An assumed PDD for the residuals, $y_{pred} -y_{obs}$, provides the likelihood of each observation given the model and a sample from its parameters space. There is a prior for the residuals PDD. That likelihood guides subsequent sampling to converge on a "best fit" multivariate PDD for the parameters @gelman2013.
+
+### Diagnostics
+
+An essential concept in Bayesian statistics is that the data is known but the best model for that data is unknown @mcelreath2016 and always a vast simplification of reality @jaynes2003. Metrics to compare and rank competing models are required. In ecological systems, a superabundance of habitat indicators as covariates means over-fitting is a problem. Leave-one-out (LOO) statistics[^1], where each point is predicted while omitted from fitting (cross-validations), provides diagnostics for over-fitting. We used **ELPD,** the sum of expected log predictive probability density for each of \$n\$ omitted observation's prediction, and $ELPD_{SE}=\text{sd}(ELPD)/\sqrt(n)$ the standard error of those probabilities @vehtari2017.
+
+[^1]: see R package LOO <https://cran.r-project.org/web/packages/loo/loo.pdf> and LOO Package Glossary <https://mc-stan.org/loo/reference/loo-glossary.html>.
+
+# Results
+
+> outline: Simulations recapture residence. why critical. Tables \* descriptions and fits (ELPD, AIC,) comparison of Stan models\
+> \* parameter estimates and statistics for best model (so far).\
+> Plots\
+> \* example of model with CLs to entry and exit CPDs, observed datapoints, and CLs for predicted curve. Just one year. \* timing, spread, residence by years, with CLs. Fancier the better.
+
+## Model selection and convergence
+Based on ELPD statistics (@fig-mod_compare B) we selected model 7 as the best from those explored. This model included year-to-year variation in spawner abundance, arrival timing, arrival spread, and death spread, but assumed that residence time and observation error is constant across years. Model 8, which also allowed residence time to vary across years had an equivalent ELPD ($\Delta$ELPD = `r round(loo_df$dloo[2], 1)`, SE = `r round(loo_df$se[2], 1)`).
+
+The effective number of parameters ($\mathrm{p}_{\mathrm{loo}}$) increased when arrival timing variation was introduced (model 1 vs. 2), and also when any of arrival spread, death spread, or residence were allowed to vary (models 3 to 8; @fig-mod_compare C). However, all models with variation in any or all of these parameters (models 3 to 8) had similar numbers of effective parameters. 
+
+Convergence was good for model 7; all parameters had $\hat{R}$ values $\leq$ `r max(worst_Rhat$Rhat)` and effective sample sizes $\geq$ `r round(min(worst_Rhat$n_eff))`. Allowing residence time to vary across years (model 8), resulted in some minor convergence issues; `r round(mean(worst_Rhat8$Rhat>1.01)*100,1)`% of parameters had $\hat{R} > 1.01$, and the highest $\hat{R}$ was `r round(max(worst_Rhat8$Rhat),2)`. Model 8 also had `r round(mean(worst_Rhat8$n_eff<400)*100, 1)`% of its parameters with effective sample sizes $<400$, the lowest being `r round(min(worst_Rhat8$n_eff))`. The reason that model 8 exhibited minor convergence issues is likely because of a posterior correlation between residence time and the other timing parameters, which are only partially identifiable from the observed spawner counts. Thus, we have selected the simpler model (model 7), which has equivalent predictive power and which does not have convergence issues, but we contrast the results from both where appropriate.  
+
+```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= 'center', fig.cap= "Model summary and comparison. *Panel A* shows which parameters were held constant (white) versus varied (black) across years in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. *Panel C* shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors."}
 
 data.frame(model = c("m1","m2","m3","m4", "m5", "m6","m7", "m8"), 
            arrival = c("constant", "varies", "varies", "varies", "varies", "varies", "varies", "varies"), 
@@ -407,38 +451,9 @@ ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
   plot_layout(widths = c(1, 0.5, 0.5))
 ```
 
-> outline: describe the different multi-level Stan models (which, why) details of Stan models: how and why: priors, inits, convergence,
-
-### Likelihood Model
-
-JLT, please. About sampling negative binomial residuals to fit. Compared to lognormal:\
-target \<- normal_lpdf(log_run_predicted\|log_run_predicted, residuals)
-
-Our negative binomial distribution accounts for overdispersion in observed counts as $\mathrm{live}_\phi$, which includes both observation error as well as unmodelled variation in spawner abundance. 
-
-The observed (dependent) variable, $y_{obs}$, is predicted, $y_{pred}$, by a sample of the parameters from the chosen model. An assumed PDD for the residuals, $y_{pred} -y_{obs}$, provides the likelihood of each observation given the model and a sample from its parameters space. There is a prior for the residuals PDD. That likelihood guides subsequent sampling to converge on a "best fit" multivariate PDD for the parameters @gelman2013.
-
-### Diagnostics
-
-An essential concept in Bayesian statistics is that the data is known but the best model for that data is unknown @mcelreath2016 and always a vast simplification of reality @jaynes2003. Metrics to compare and rank competing models are required. In ecological systems, a superabundance of habitat indicators as covariates means over-fitting is a problem. Leave-one-out (LOO) statistics[^1], where each point is predicted while omitted from fitting (cross-validations), provides diagnostics for over-fitting. We used **ELPD,** the sum of expected log predictive probability density for each of \$n\$ omitted observation's prediction, and $ELPD_{SE}=\text{sd}(ELPD)/\sqrt(n)$ the standard error of those probabilities @vehtari2017.
-
-[^1]: see R package LOO <https://cran.r-project.org/web/packages/loo/loo.pdf> and LOO Package Glossary <https://mc-stan.org/loo/reference/loo-glossary.html>.
-
-# Results
-
-> outline: Simulations recapture residence. why critical. Tables \* descriptions and fits (ELPD, AIC,) comparison of Stan models\
-> \* parameter estimates and statistics for best model (so far).\
-> Plots\
-> \* example of model with CLs to entry and exit CPDs, observed datapoints, and CLs for predicted curve. Just one year. \* timing, spread, residence by years, with CLs. Fancier the better.
-
-## Model selection 
-Based on ELPD statistics (@mod_compare B) we selected model 7 as the best from those explored. This model included year-to-year variation in spawner abundance, arrival timing, arrival spread, and death spread, but assumed that residence time and observation error is constant across years. Model 8, which also allowed residence time to vary across years had an equivalent ELPD ($\Delta$ELPD = `r round(loo_df$dloo[2], 1)`, SE = `r round(loo_df$se[2], 1)`). We have selected the simpler model, for parsimony, but contrast the results from both where appropriate.  
-
-The effective number of parameters ($\mathrm{p}_{\mathrm{loo}}$) increased when arrival timing variation was introduced (model 1 vs. 2), and also when any of arrival spread, death spread, or residence were allowed to vary (models 3 to 8; @mod_compare C). However, all models with variation in any or all of these parameters (models 3 to 8) had similar numbers of effective parameters. 
-
 
 ## Model fit to observed counts  
-Our expected counts correspond well with the observed counts @fig-spawnercurves and @fig-obsfit. Variation between the observed and expected is quantified in our estimate of spawner count overdispersion ($\mathrm{live}_\phi$). The posterior median of ($\mathrm{live}_\phi$) was `r round(median(post$live_phi), 1)` (95% CI: `r round(quantile(post$live_phi, 0.025), 1)`--`r round(quantile(post$live_phi, 0.975), 1)`).
+Our expected counts correspond well with the observed counts @fig-spawnercurves and @fig-obsfit. Variation between the observed and expected is quantified in our estimate of spawner count overdispersion ($\mathrm{live}_\phi$), which had a posterior median of `r round(median(post$live_phi), 1)` (95% CI: `r round(quantile(post$live_phi, 0.025), 1)`--`r round(quantile(post$live_phi, 0.975), 1)`).
 
 <!--@Scott - you asked for free-y axis on this figure. I tried this, but that really emphasizes the deviations from the predicted for the high count values. This does the dual job of showing the fit and the year to year variability in total abundance, linking it to the abundance time series figure. I don't think the log fit is necessary. But, if you have strong feelings, I am happy to change.-->
 
@@ -513,7 +528,7 @@ spread_draws(fit, arrival[year]) %>%
   plot_annotation(tag_levels = "A")
 ```
 
-Residence was estimated as `r round(median(post$residence), 1)` days (95% CI; `r round(quantile(post$residence, 0.025), 1)`--`r round(quantile(post$residence, 0.975), 1)`; @fig-residence). 
+Residence was estimated as `r round(median(post$residence), 1)` days (95% CI; `r round(quantile(post$residence, 0.025), 1)`--`r round(quantile(post$residence, 0.975), 1)`; @fig-residence). In the alternative model (m8) where residence is allowed to vary across years, the median residence time across years was `r round(median(apply(post8$residence,2,median)), 1)` days (@fig-timingsalt D; inter-annual range: `r round(min(apply(post8$residence,2,median)), 1)`--`r round(max(apply(post8$residence,2,median)), 1)`).
 
 ```{r fig-residence, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distribution of the estimated mean residence time. Points and error bars show the posterior median and the 66% and 95% credible intervals. The vertical dashed line shows the 11 day residence time that has previously been assumed for this system.", fig.align='center', fig.height=4, fig.width=5}
 gather_draws(fit, residence) %>% 
@@ -542,13 +557,20 @@ AUC_in_66 <- trad_AUC %>%
   left_join(run_intervals, by = "year") %>%
   mutate(in_66 = nerkids > lower & nerkids < upper, 
          lower =  median > nerkids) 
+
+perc_diff <- spread_draws(fit, log_run[year]) %>%
+  mutate(year = year + min(spawners$year) - 1) %>%
+  mutate(run = exp(log_run)) %>% 
+  left_join(trad_AUC) %>% 
+  mutate(perc_diff = 100 * (run-nerkids)/((run + nerkids)/2)) %>% 
+   group_by(year) %>% 
+  summarise(perc_diff = median(perc_diff)) %>% 
+  ungroup()
   
 ```
-Estimated posterior median annual spawner abundances vary from as low as `r round(min(apply(exp(post$log_run), 2, median)))` in `r which(apply(exp(post$log_run), 2, median) == min(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1` to as high as `r round(max(apply(exp(post$log_run), 2, median)))` in `r which(apply(exp(post$log_run), 2, median) == max(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1`. Since 2008, spawner abundance has alternated between low and high levels in a two-year cycle. The posterior estimate from our method is, on average, higher than the AUC estimate ()
+Estimated posterior median annual spawner abundances vary from as low as `r round(min(apply(exp(post$log_run), 2, median)),-2)` in `r which(apply(exp(post$log_run), 2, median) == min(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1` to as high as `r comma(round(max(apply(exp(post$log_run), 2, median)),-3))` in `r which(apply(exp(post$log_run), 2, median) == max(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1`. Since 2008, spawner abundance has alternated between low and high levels in a two-year cycle. 
 
-in `r sum(AUC_in_66$lower)`% of the `r nrow(AUC_in_66)` years.  
-
-The traditional trapezoidal AUC, with an assumed 11 day residence time, estimate falls within the 66% credible interval of our model prediction in all years. 
+Our estimated annual abundances are, on average, slightly higher than those from the traditional trapezoidal AUC estimate, with an assumed 11 day residence time. The median difference across all years is `r round(median(perc_diff$perc_diff), 1)` % (inter-annual range: `r round(min(perc_diff$perc_diff), 1)`--`r round(max(perc_diff$perc_diff), 1)`), which is a smaller difference compared to the `r round(median((11 - post$residence)/11) *100, 1)` increase that we would expect if we were to apply our estimated residence time (`r round(median(post$residence),1)` days) to the traditional method. In addition, while our spawner abundance estimate tends to be higher, this is only the case in `r sum(AUC_in_66$lower)`% of the `r nrow(AUC_in_66)` years and the traditional estimate falls within the 66% credible interval of our model prediction in all years. 
 
 ```{r fig-runs, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of total spawning abundance by year (black) compared to the point estimate based on traditional trapezoidal AUC with an assumed 11 day residence (red). Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=4, fig.width=7}
 spread_draws(fit, log_run[year]) %>% 
