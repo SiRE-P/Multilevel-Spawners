@@ -128,8 +128,8 @@ sp_dat = list(n_priors = nrow(priors),
 
 
 run_or_load_stan <- function(model_name, stan_path, data_list, chains = 4, cores = 4) {
-  fit_file <- paste0("./model_fits/", model_name, ".RData")
-  hash_file <- paste0("./model_fits/", model_name, ".md5")
+  fit_file <- paste0("../model_fits/", model_name, ".RData")
+  hash_file <- paste0("../model_fits/", model_name, ".md5")
   current_hash <- unname(tools::md5sum(stan_path))
   
   if (!file.exists(fit_file) || !file.exists(hash_file) || readLines(hash_file) != current_hash) {
