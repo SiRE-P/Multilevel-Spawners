@@ -69,7 +69,7 @@ theme_set(theme_bw())
 
 ```{r load_data, include=FALSE}
 
-spawners <- read.csv("./data/spawn_timing.csv") %>% 
+spawners <- read.csv("../data/spawn_timing.csv") %>% 
   mutate(date = as.Date(date), year = year(date), yday = yday(date))
 
 index_sk <- spawners %>% 
@@ -145,14 +145,14 @@ run_or_load_stan <- function(model_name, stan_path, data_list, chains = 4, cores
   return(fit)
 }
 
-fit_m1 <- run_or_load_stan("spawner_m1", "./stan/spawners_m1.stan", sp_dat)
-fit_m2 <- run_or_load_stan("spawner_m2", "./stan/spawners_m2.stan", sp_dat)
-fit_m3 <- run_or_load_stan("spawner_m3", "./stan/spawners_m3.stan", sp_dat)
-fit_m4 <- run_or_load_stan("spawner_m4", "./stan/spawners_m4.stan", sp_dat)
-fit_m5 <- run_or_load_stan("spawner_m5", "./stan/spawners_m5.stan", sp_dat)
-fit_m6 <- run_or_load_stan("spawner_m6", "./stan/spawners_m6.stan", sp_dat)
-fit_m7 <- run_or_load_stan("spawner_m7", "./stan/spawners_m7.stan", sp_dat)
-fit_m8 <- run_or_load_stan("spawner_m8", "./stan/spawners_m8.stan", sp_dat)
+fit_m1 <- run_or_load_stan("spawner_m1", "../stan/spawners_m1.stan", sp_dat)
+fit_m2 <- run_or_load_stan("spawner_m2", "../stan/spawners_m2.stan", sp_dat)
+fit_m3 <- run_or_load_stan("spawner_m3", "../stan/spawners_m3.stan", sp_dat)
+fit_m4 <- run_or_load_stan("spawner_m4", "../stan/spawners_m4.stan", sp_dat)
+fit_m5 <- run_or_load_stan("spawner_m5", "../stan/spawners_m5.stan", sp_dat)
+fit_m6 <- run_or_load_stan("spawner_m6", "../stan/spawners_m6.stan", sp_dat)
+fit_m7 <- run_or_load_stan("spawner_m7", "../stan/spawners_m7.stan", sp_dat)
+fit_m8 <- run_or_load_stan("spawner_m8", "../stan/spawners_m8.stan", sp_dat)
 
 
 #model checks####
