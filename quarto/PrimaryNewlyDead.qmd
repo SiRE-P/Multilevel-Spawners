@@ -243,7 +243,7 @@ After one to three years (rarely more) of marine growth, adults return to the Co
 
 Spawner estimates for Osoyoos sockeye have historically been based on trapezoidal AUC, with an assumed residence time of 11 days [@hyatt2010]. However, residence time was never assessed for this population directly. Therefore, the selected residence time was based on the estimate for the early Stuart sockeye stock [@perrin1990] because that stock has similar average body size, migration distance, and migratory timing [@hyatt2010]. <!-- cite as - Hyatt, Kim , Margot Stockwell, Howie Wright, Lynnea Wiens and Paul Askey. 2010. Okanagan Fish and Water Management Tools Project Assessments: Brood Year 2009 Salmon (Oncorhynchus nerka) Abundance and Biological Traits.  Report to file: JSIDS- SRe10-10. Salmon in Regional Ecosystems Program, Fisheries and Oceans Canada, Nanaimo, B.C.  V9T 6N7. 28 p.-->
 
-![The spawning grounds for Sockeye Salmon population that rear as parr in the North Basin of Osoyoos Lake are \~20 to 30 km upstream, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. River flows that affect spawners, eggs, and parr are monitored by Environment Canada (EC) at the site indicated. Map by Braden Judson, Pacific Biological Station.](figures/Okanagan_to_Osoyoo_Lakes.png){#fig-map fig-align="center" width="5in"}
+![The spawning grounds for Sockeye Salmon population that rear as parr in the North Basin of Osoyoos Lake are \~20 to 30 km upstream, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. River flows that affect spawners, eggs, and parr are monitored by Environment Canada (EC) at the site indicated. Map by Braden Judson, Pacific Biological Station.](../figures/Okanagan_to_Osoyoo_Lakes.png){#fig-map fig-align="center" width="5in"}
 
 # Data
 ### Enumeration surveys
@@ -771,7 +771,7 @@ spread_draws(fit, live_mu[obs]) %>%
   scale_x_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Observed count (thousands)")
 ```
 
-![Newly dead spawners each day (blue) is the rate of exits. Newly dead accumulate between surveys, here with alternating 1 day and 4 day separations, leading to an irregular pattern of counts (red). Parameters as in preceding figure.](figures/newly_dead.png){#fig-newlydead fig-align="center" width="4in"}
+![Newly dead spawners each day (blue) is the rate of exits. Newly dead accumulate between surveys, here with alternating 1 day and 4 day separations, leading to an irregular pattern of counts (red). Parameters as in preceding figure.](../figures/newly_dead.png){#fig-newlydead fig-align="center" width="4in"}
 
 
 
