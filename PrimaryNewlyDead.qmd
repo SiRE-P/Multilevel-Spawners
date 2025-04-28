@@ -69,7 +69,7 @@ theme_set(theme_bw())
 
 ```{r load_data, include=FALSE}
 
-spawners <- read.csv("../../../okanagan_data/2025-04-07 Draft/Spawn Timing Data/spawn_timing.csv") %>% 
+spawners <- read.csv("./data/spawn_timing.csv") %>% 
   mutate(date = as.Date(date), year = year(date), yday = yday(date))
 
 index_sk <- spawners %>% 
@@ -395,9 +395,9 @@ An essential concept in Bayesian statistics is that the data is known but the be
 > \* example of model with CLs to entry and exit CPDs, observed datapoints, and CLs for predicted curve. Just one year. \* timing, spread, residence by years, with CLs. Fancier the better.
 
 ## Model selection and convergence
-Based on ELPD statistics (@fig-mod_compare B) we selected model 7 as the best from those explored. This model included year-to-year variation in spawner abundance, arrival timing, arrival spread, and death spread, but assumed that residence time and observation error is constant across years. Model 8, which also allowed residence time to vary across years had an equivalent ELPD ($\Delta$ELPD = `r round(loo_df$dloo[2], 1)`, SE = `r round(loo_df$se[2], 1)`).
+Based on ELPD statistics (@fig-modcompare B) we selected model 7 as the best from those explored. This model included year-to-year variation in spawner abundance, arrival timing, arrival spread, and death spread, but assumed that residence time and observation error is constant across years. Model 8, which also allowed residence time to vary across years had an equivalent ELPD ($\Delta$ELPD = `r round(loo_df$dloo[2], 1)`, SE = `r round(loo_df$se[2], 1)`).
 
-The effective number of parameters ($\mathrm{p}_{\mathrm{loo}}$) increased when arrival timing variation was introduced (model 1 vs. 2), and also when any of arrival spread, death spread, or residence were allowed to vary (models 3 to 8; @fig-mod_compare C). However, all models with variation in any or all of these parameters (models 3 to 8) had similar numbers of effective parameters. 
+The effective number of parameters ($\mathrm{p}_{\mathrm{loo}}$) increased when arrival timing variation was introduced (model 1 vs. 2), and also when any of arrival spread, death spread, or residence were allowed to vary (models 3 to 8; @fig-modcompare C). However, all models with variation in any or all of these parameters (models 3 to 8) had similar numbers of effective parameters. 
 
 Convergence was good for model 7; all parameters had $\hat{R}$ values $\leq$ `r max(worst_Rhat$Rhat)` and effective sample sizes $\geq$ `r round(min(worst_Rhat$n_eff))`. Allowing residence time to vary across years (model 8), resulted in some minor convergence issues; `r round(mean(worst_Rhat8$Rhat>1.01)*100,1)`% of parameters had $\hat{R} > 1.01$, and the highest $\hat{R}$ was `r round(max(worst_Rhat8$Rhat),2)`. Model 8 also had `r round(mean(worst_Rhat8$n_eff<400)*100, 1)`% of its parameters with effective sample sizes $<400$, the lowest being `r round(min(worst_Rhat8$n_eff))`. The reason that model 8 exhibited minor convergence issues is likely because of a posterior correlation between residence time and the other timing parameters, which are only partially identifiable from the observed spawner counts. Thus, we have selected the simpler model (model 7), which has equivalent predictive power and which does not have convergence issues, but we contrast the results from both where appropriate.  
 
