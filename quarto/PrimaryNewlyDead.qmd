@@ -368,12 +368,39 @@ The model parameters are further described in the simulation model (Supplementar
 We challenged this model with simulated observations to ensure robust and reliable results. Parameters were sampled randomly from prior PDDs. Simulated surveys were deliberately poor: the number of surveys each year was random uniform between 6 and 10, and survey dates within years random uniform but separated by at least 1 day. The resulting "true" data, but with multiplicative normal sampling error (% accuracy), was the "observed" data subsequently fitted by the multi-level regression coded in Stan. The scenarios explored fits (see Stan Model) with and without surveys of newly dead spawners. Despite noisy observations and gaps between surveys, parameters were recovered accurately from Stan model, with the caveat that the model used to fit the simulated data was the model that created it. Specifically, this procedure correctly estimated residence over a wide range. The simulations also generated indices of relative abundance of spawners, such as AUC as Gaussian and as linear interpolations (a trapezoid), peak live, and peak live plus dead (PLD). These were compared to the fitted run size to indicate reliability.
 
 ## Stan Models
-$$
-\begin{aligned}
+We modelled spawner abundance based on observed spawner counts using a series of hierarchical Bayesian models fit in the Stan programming language [@stan]. These models varied in complexity and the degree to which they allowed for interannual variation in the arrival and exit processes. However, all models follow the general set of processes shown in @fig-enterexit. Live spawners counts are integers and can include zero. Therefore, we used a Negative Binomial distribution for the observation model:
+
+$$N_{y,d}^{\text{live}} \sim \text{NegBinomial}(\mu^\text{live}_{y,d}, \phi^{\text{live}})$$
+where $\mu^\text{live}_{y,d}$ is the expected number of live spawners present in year $y$ on day $d$, and $\phi^\text{live}$ captures variability around $\mu^\text{live}_{y,d}$, including both observation error and natural variation that is not explicitly modelled. We assume that this expected number of spawners $\mu^\text{live}_{y,d}$ is a function of three unobserved (i.e., latent) quantities that are estimated in our model:  the proportion of spawners that have arrived by day $d$, $p^\text{arrived}_{y,d}$; the proportion of those that have exited the live population, $p^\text{exited}_{y,d}$ (i.e., died or left the spawning grounds), and total spawner abundance in that year, $N_y^{\text{spawners}}$:
+$$mu^\text{live}_{y,d} \approx p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d}) \times N_y^{\text{spawners}}.$$
+We assume that the spawners arrive over a range of days that follows a normal distribution, reside there for some days of spawning activity, and then die or leave the spawning grounds, thereby exiting the live counts following a second normal distribution that lags the arrival distribution. Thus, the proportion of spawners that have arrived by a given date $d$ in year $y$ follows a cumulative normal distribution:
+$$p^\text{arrived}_{y,d} = \Phi\left( \frac{ d - \mu^\text{arrival}_y }{ \sigma^\text{arrival}_y } \right).$$ 
+Likewise, the proportion of arrived spawners that have exited the live count by a given date $d$ in year $y$ follows a second cumulative normal distribution: 
+$$p^\text{exited}_{y,d} = \Phi\left( \frac{ d - (\mu^\text{arrival}_y + \mu^\text{exit lag}_y)}{\sigma^\text{exit}_y} \right),$$ 
+where $\mu^\text{exit lag}_y$ defines the number of days by which the mean exit date lags behind the mean arrival date $\mu^\text{arrival}_y$. Total spawner abundance, $N_y^{\text{spawners}}$, in each year is a primary variable of interest and is estimated by the model as the scaling factor that links the estimated arrival and exit processes to the expected live spawners, $mu^\text{live}_{y,d}$. To prevent numerical instability when this equation approaches zero, we use a log-transformed approximation of the same form:
+$$\mu^\text{live}_{y,d} =  \exp\left( \log\left(1 + 10^4 \times p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right) - \log(10^4) \right) \times N_y^{\text{spawners}}$$
+where the factor $10^4$ serves as a scaling factor that prevents changes in near-zero values from having an abrupt influence on $\mu^\text{live}_{y,d}$.
+
+Although $\mu^\text{exit lag}_y$ defines the average delay between arrival and exit distributions, it does not equal the mean residence time. This is because residence time depends on the interaction of both arrival and exit processes and is not directly estimated by any single parameter of the model. Importantly, whenever $\sigma^\text{arrival}_y \neq \sigma^\text{exit}_y$, residence time cannot be the same for all individuals, and instead varies depending on when the fish arrive. We can, however, calculate a mean residence time in each year based on the sum of estimated number of live spawners across all days in the spawning period, $D$, divided by the estimated total spawner abundance:
+$$\mu^{\text{residence}}_y = \frac{\sum_{d = 1}^D \left(p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d}) \times N_y^{\text{spawners}}\right)}{N_y^{\text{spawners}}}.$$ 
+This is the equivalent of back calculating mean residence time from the area under the curve, which is possible because we have directly estimated $N_y^{\text{spawners}}$. However, because $N_y^{\text{spawners}}$ appears in both the numerator and the denominator, we can simplify this equation as:
+$$\mu^{\text{residence}}_y = \sum_{d = 1}^D \left(p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right).$$
+
+
+
+
+(summarised in @fig-modcompare A)
+
+
+to code series of increasingly complicated series of non-linear, multi-level Bayesian regressions to challenge this model with data. We explored which parameters were important and the trade-off of complication with precision. Our initial fits used explicit and tightly bounded prior PDD (informed priors), and initiated Monte Carlo sampling chains with parameter estimates derived from the data, but this was not necessary, the default procedures successfully initiated sampling chains. See Supplementary Materials for the Stan code that fits these models, plus the R code run it. includes this code, and details regarding convergence and model comparisons.
+
+
+$$ 
+\begin{aligned} 
 N_{y,d}^{\text{live}} &\sim \text{NegBinomial}(\mu^\text{live}_{y,d}, \phi^{\text{live}}) \\
-\mu^\text{live}_{y,d} &= N_y^{\text{spawners}} \times \exp\left( \log\left(1 + 10^4 \times \text{arrived}_{y,d} \times (1 - \text{exited}_{y,d})\right) - \log(10^4) \right) \\
-\text{arrived}_{y,d} &= \Phi\left( \frac{ d - \mu^\text{arrival}_y }{ \sigma^\text{arrival}_y } \right) \\
-\text{exited}_{y,d} &= \Phi\left( \frac{ d - (\mu^\text{arrival}_y + \mu^\text{exit lag}_y)}{\sigma^\text{exit}_y} \right)\\
+\mu^\text{live}_{y,d} &=  \exp\left( \log\left(1 + 10^4 \times p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right) - \log(10^4) \right) \times N_y^{\text{spawners}} \\
+p^\text{arrived}_{y,d} &= \Phi\left( \frac{ d - \mu^\text{arrival}_y }{ \sigma^\text{arrival}_y } \right) \\
+p^\text{exited}_{y,d} &= \Phi\left( \frac{ d - (\mu^\text{arrival}_y + \mu^\text{exit lag}_y)}{\sigma^\text{exit}_y} \right)\\
 \log(N_y^{\text{spawners}}) &\sim \text{Normal}(10, 1)\\
 \mu^\text{arrival}_y &\sim \text{Normal}(\mu^\text{arrival}_\mu, \mu^\text{arrival}_\sigma)\\
 \mu^\text{arrival}_\mu &\sim \text{Normal}(40, 5)\\
@@ -388,8 +415,8 @@ N_{y,d}^{\text{live}} &\sim \text{NegBinomial}(\mu^\text{live}_{y,d}, \phi^{\tex
 \sigma^\text{exit}_\mu &\sim \text{Normal}(\log(7), 0.2)\\
 \sigma^\text{exit}_\sigma &\sim \text{Exponential}(10)\\
 \end{aligned}
-$$
-We used the Stan programming language [@stan] to code series of increasingly complicated series of non-linear, multi-level Bayesian regressions to challenge this model with data. We explored which parameters were important and the trade-off of complication with precision. Our initial fits used explicit and tightly bounded prior PDD (informed priors), and initiated Monte Carlo sampling chains with parameter estimates derived from the data, but this was not necessary, the default procedures successfully initiated sampling chains. See Supplementary Materials for the Stan code that fits these models, plus the R code run it. includes this code, and details regarding convergence and model comparisons.
+$$ {#eq-fullmodel}
+
 
 Differences between the models are summarised in @fig-modcompare A.
 
@@ -529,10 +556,10 @@ for(j in 1:ncol(post$log_run)){
     entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
     exited <- pnorm(x, post$arrival[,j] + post$exit_lag, post$exit_spread[,j])
     
-    exp(post$log_run[,j] + log(entered - (entered * exited)))
+    entered * (1 - exited)
   })
   
-  effective_residence[,j] <- apply(live, 1, sum)/exp(post$log_run[,j])
+  effective_residence[,j] <- apply(live, 1, sum)
 }
 
 colnames(effective_residence) <- unique(index_sk$year)
@@ -547,7 +574,7 @@ Exit spread ($\sigma_y^\text{exit}$) tended to be lower than arrival spread (@fi
 
 Together, the timing parameters result in year-to-year variation in the mean residence time (@fig-timings D). The posterior median across years is `r round(median(effective_residence), 1)` days, but it ranges from `r round(min(apply(effective_residence, 2, median)), 1)` to `r round(max(apply(effective_residence, 2, median)), 1)` days.- 
 
-```{r fig-timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of mean arrival ($\\mu_y^{\\text{arrival}}$; A), arrival spread ($\\sigma_y^{\\text{arrival}}$; B), exit spread ($\\sigma_y^{\\text{exit}}$; C), and the resulting mean residence time (D). The dashed line in panel D shows the previously assumed 11 day residence time. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=9, fig.width=6}
+```{r fig-timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of mean arrival ($\\mu_y^{\\text{arrival}}$; A), arrival spread ($\\sigma_y^{\\text{arrival}}$; B), exit spread ($\\sigma_y^{\\text{exit}}$; C), and the resulting mean residence time ($\\mu^{\\text{residence}}_y$; D). The dashed line in panel D shows the previously assumed 11 day residence time. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=9, fig.width=6}
 spread_draws(fit, arrival[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>%
   ggplot(aes(x = year, y = arrival + day_stand))+
@@ -583,7 +610,7 @@ spread_draws(fit, arrival[year]) %>%
   stat_pointinterval()+
   geom_hline(yintercept = 11, lty = 2)+
   scale_y_continuous(breaks = seq(1, 19, by = 2))+
-  labs(y = "Mean residence (days)", x = "")+
+  ylab(bquote("Mean residence (" * mu[y]^residence * ")"))+
   theme_bw()+
   
   plot_annotation(tag_levels = "A")
