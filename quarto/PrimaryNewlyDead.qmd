@@ -42,8 +42,6 @@ format:
   elsevier-pdf:
     keep-tex: false
     number-sections: true
-    math:
-      
     journal:
       name: Fisheries Research
       formatting: preprint
