@@ -15,8 +15,8 @@ parameters {
   
   // simple
   real<lower=0>      arrival_spread;     // stdev entry
-  real<lower=0>      death_spread;      // stdev death
-  real     residence_raw;  // lag entry to exit
+  real<lower=0>      exit_spread;      // stdev exit
+  real     exit_lag_raw;  // lag entry to exit
   real<lower=0>         live_phi;   // dispersion parameter on live fish sampling
   
   // instance in group, multi-level
@@ -31,8 +31,8 @@ transformed parameters{
     arrival[y] = arrival_mu + arrival_sigma * arrival_z[y];
   }
   
-  real residence;
-  residence = exp(residence_raw) + 1;
+  real exit_lag;
+  exit_lag = exp(exit_lag_raw) + 1;
   
   //process model
   // live
@@ -40,7 +40,7 @@ transformed parameters{
   for(i in 1:n_obs){
     real mean_arrival = arrival[year[i]];
     real entered = normal_cdf(day[i], mean_arrival, arrival_spread);  
-    real exited  = normal_cdf(day[i], mean_arrival + residence, death_spread);
+    real exited  = normal_cdf(day[i], mean_arrival + exit_lag, exit_spread);
     live_mu[i] = exp(log_run[year[i]] +log1p(entered * (1 - exited) * 1e4) - log(1e4));
   }
 }
@@ -55,11 +55,11 @@ model {
   
   log(arrival_spread) ~ normal(priors[4,1], priors[4,2]);  // 
   
-  log(death_spread)  ~ normal(priors[4,1], priors[4,2]);  // 
+  log(exit_spread)  ~ normal(priors[4,1], priors[4,2]);  // 
   
   // simple PDD
   log_run ~ normal(priors[1,1], priors[1,2]);  // mean  run log
-  residence_raw  ~ normal(priors[6,1], priors[6,2]);  // same all years
+  exit_lag_raw  ~ normal(priors[6,1], priors[6,2]);  // same all years
   log(live_phi)   ~ normal(priors[7,1], priors[7,2]);
   
   

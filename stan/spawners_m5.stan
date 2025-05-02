@@ -15,10 +15,10 @@ parameters {
   
   real      arrival_spread;     // stdev entry
 
-  real      death_spread;      // stdev death
+  real      exit_spread;      // stdev exit
 
-  real      residence_mu;  // lag entry to exit
-  real<lower=0> residence_sigma;  
+  real      exit_lag_mu;  // lag entry to exit
+  real<lower=0> exit_lag_sigma;  
 
   // simple
   real<lower=0>         live_phi;   // dispersion parameter on live fish sampling
@@ -26,18 +26,18 @@ parameters {
   // instance in group, multi-level
   vector[n_years] log_run;
   vector[n_years] arrival_z;
-  vector[n_years] residence_z;
+  vector[n_years] exit_lag_z;
 }
 
 transformed parameters{
   //non-centered priors
   vector[n_years] arrival;
-  vector[n_years] residence;
+  vector[n_years] exit_lag;
   
   
   for (y in 1:n_years){
     arrival[y] = arrival_mu + arrival_sigma * arrival_z[y];
-    residence[y] = exp(residence_mu + residence_sigma * residence_z[y]) + 1;
+    exit_lag[y] = exp(exit_lag_mu + exit_lag_sigma * exit_lag_z[y]) + 1;
   }
 
   
@@ -47,7 +47,7 @@ transformed parameters{
   for(i in 1:n_obs){
     real mean_arrival = arrival[year[i]];
     real entered = normal_cdf(day[i], mean_arrival, arrival_spread);  
-    real exited  = normal_cdf(day[i], mean_arrival + residence[year[i]], death_spread);
+    real exited  = normal_cdf(day[i], mean_arrival + exit_lag[year[i]], exit_spread);
     live_mu[i] = exp(log_run[year[i]] +log1p(entered * (1 - exited) * 1e4) - log(1e4));
   }
 }
@@ -62,11 +62,11 @@ model {
   
   log(arrival_spread)  ~ normal(priors[4,1], priors[4,2]);  // 
   
-  log(death_spread)   ~ normal(priors[4,1], priors[4,2]);  // 
+  log(exit_spread)   ~ normal(priors[4,1], priors[4,2]);  // 
   
-  residence_mu ~ normal(priors[6,1], priors[6, 2]);
-  residence_sigma ~ exponential(priors[5,2]);
-  residence_z ~ normal(0, 1);
+  exit_lag_mu ~ normal(priors[6,1], priors[6, 2]);
+  exit_lag_sigma ~ exponential(priors[5,2]);
+  exit_lag_z ~ normal(0, 1);
   
   // simple PDD
   log_run ~ normal(priors[1,1], priors[1,2]);  // mean  run log
@@ -82,3 +82,4 @@ generated quantities{
   for(i in 1:n_obs)
   log_lik[i] = neg_binomial_2_lpmf(live_counts[i] | live_mu[i], live_phi);
 }
+

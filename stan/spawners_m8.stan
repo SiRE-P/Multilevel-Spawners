@@ -16,11 +16,11 @@ parameters {
   real      arrival_spread_mu;     // stdev entry
   real<lower=0> arrival_spread_sigma;     
   
-  real      death_spread_mu;      // stdev death
-  real<lower=0> death_spread_sigma;  
+  real      exit_spread_mu;      // stdev exit
+  real<lower=0> exit_spread_sigma;  
   
-  real      residence_mu;  // lag entry to exit
-  real<lower=0> residence_sigma;  
+  real      exit_lag_mu;  // lag entry to exit
+  real<lower=0> exit_lag_sigma;  
 
   // simple
   real<lower=0>         live_phi;   // dispersion parameter on live fish sampling
@@ -29,23 +29,23 @@ parameters {
   vector[n_years] log_run;
   vector[n_years] arrival_z;
   vector[n_years] arrival_spread_z;
-  vector[n_years] death_spread_z;
-  vector[n_years] residence_z;
+  vector[n_years] exit_spread_z;
+  vector[n_years] exit_lag_z;
 }
 
 transformed parameters{
   //non-centered priors
   vector[n_years] arrival;
   vector[n_years] arrival_spread;
-  vector[n_years] death_spread;
-  vector[n_years] residence;
+  vector[n_years] exit_spread;
+  vector[n_years] exit_lag;
   
   
   for (y in 1:n_years){
     arrival[y] = arrival_mu + arrival_sigma * arrival_z[y];
     arrival_spread[y] = exp(arrival_spread_mu + arrival_spread_sigma * arrival_spread_z[y]) + 1;
-    death_spread[y] = exp(death_spread_mu + death_spread_sigma * death_spread_z[y]) + 1;
-    residence[y] = exp(residence_mu + residence_sigma * residence_z[y]) + 1;
+    exit_spread[y] = exp(exit_spread_mu + exit_spread_sigma * exit_spread_z[y]) + 1;
+    exit_lag[y] = exp(exit_lag_mu + exit_lag_sigma * exit_lag_z[y]) + 1;
   }
 
   
@@ -55,7 +55,7 @@ transformed parameters{
   for(i in 1:n_obs){
     real mean_arrival = arrival[year[i]];
     real entered = normal_cdf(day[i], mean_arrival, arrival_spread[year[i]]);  
-    real exited  = normal_cdf(day[i], mean_arrival + residence[year[i]], death_spread[year[i]]);
+    real exited  = normal_cdf(day[i], mean_arrival + exit_lag[year[i]], exit_spread[year[i]]);
     live_mu[i] = exp(log_run[year[i]] +log1p(entered * (1 - exited) * 1e4) - log(1e4));
   }
 }
@@ -72,13 +72,13 @@ model {
   arrival_spread_sigma ~ exponential(priors[5,2]);
   arrival_spread_z ~ normal(0, 1);
   
-  death_spread_mu   ~ normal(priors[4,1], priors[4,2]);  // 
-  death_spread_sigma ~ exponential(priors[5,2]);
-  death_spread_z ~ normal(0, 1);
+  exit_spread_mu   ~ normal(priors[4,1], priors[4,2]);  // 
+  exit_spread_sigma ~ exponential(priors[5,2]);
+  exit_spread_z ~ normal(0, 1);
   
-  residence_mu ~ normal(priors[6,1], priors[6, 2]);
-  residence_sigma ~ exponential(priors[5,2]);
-  residence_z ~ normal(0, 1);
+  exit_lag_mu ~ normal(priors[6,1], priors[6, 2]);
+  exit_lag_sigma ~ exponential(priors[5,2]);
+  exit_lag_z ~ normal(0, 1);
   
   // simple PDD
   log_run ~ normal(priors[1,1], priors[1,2]);  // mean  run log
