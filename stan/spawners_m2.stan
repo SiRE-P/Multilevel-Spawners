@@ -41,8 +41,11 @@ transformed parameters{
     real mean_arrival = arrival[year[i]];
     real entered = normal_cdf(day[i], mean_arrival, arrival_spread);  
     real exited  = normal_cdf(day[i], mean_arrival + exit_lag, exit_spread);
-    live_mu[i] = exp(log_run[year[i]] +log1p(entered * (1 - exited) * 1e4) - log(1e4));
-  }
+    real log_p    = log(fmin(fmax(entered * (1 - exited), 1e-5), 1.0));
+    real log_mu   = log_run[year[i]] + log_p;
+
+    live_mu[i]    = exp(log_mu);  
+    }
 }
 
 model {

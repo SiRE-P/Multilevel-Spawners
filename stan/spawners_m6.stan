@@ -17,10 +17,10 @@ parameters {
   real<lower=0> arrival_spread_sigma;     
   
   real      exit_spread;      // stdev exit
-
+  
   real      exit_lag_mu;  // lag entry to exit
   real<lower=0> exit_lag_sigma;  
-
+  
   // simple
   real<lower=0>         live_phi;   // dispersion parameter on live fish sampling
   
@@ -43,7 +43,7 @@ transformed parameters{
     arrival_spread[y] = exp(arrival_spread_mu + arrival_spread_sigma * arrival_spread_z[y]) + 1;
     exit_lag[y] = exp(exit_lag_mu + exit_lag_sigma * exit_lag_z[y]) + 1;
   }
-
+  
   
   //process model
   // live
@@ -52,7 +52,10 @@ transformed parameters{
     real mean_arrival = arrival[year[i]];
     real entered = normal_cdf(day[i], mean_arrival, arrival_spread[year[i]]);  
     real exited  = normal_cdf(day[i], mean_arrival + exit_lag[year[i]], exit_spread);
-    live_mu[i] = exp(log_run[year[i]] +log1p(entered * (1 - exited) * 1e4) - log(1e4));
+    real log_p    = log(fmin(fmax(entered * (1 - exited), 1e-5), 1.0));
+    real log_mu   = log_run[year[i]] + log_p;
+    
+    live_mu[i]    = exp(log_mu);  
   }
 }
 
