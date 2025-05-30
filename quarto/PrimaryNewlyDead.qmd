@@ -119,14 +119,15 @@ priors <- data.frame(prior = c("log_runs_mu", "arrival_mu", "arrival_sigma", "sp
                      v1 = c(10,280-day_stand, 0,log(8-1), 0,log(11-1), 1), 
                      v2 = c(1,5,2,0.2, 10, 0.3, 0.2))
 
+index_sk_trimmed <- index_sk %>% filter(live >0)
 
 sp_dat = list(n_priors = nrow(priors), 
               priors = data.matrix(priors[,-1]),
-              n_years = max(index_sk$year_ind),
-              year = as.numeric(factor(index_sk$year)),
-              day = index_sk$yday-day_stand,
-              n_obs = nrow(index_sk),
-              live_counts = index_sk$live)
+              n_years = max(index_sk_trimmed$year_ind),
+              year = as.numeric(factor(index_sk_trimmed$year)),
+              day = index_sk_trimmed$yday-day_stand,
+              n_obs = nrow(index_sk_trimmed),
+              live_counts = index_sk_trimmed$live)
 
 
 run_or_load_stan <- function(model_name, stan_path, data_list, chains = 4, cores = 4) {
@@ -137,7 +138,7 @@ run_or_load_stan <- function(model_name, stan_path, data_list, chains = 4, cores
   if (!file.exists(fit_file) || !file.exists(hash_file) || readLines(hash_file) != current_hash) {
     message("Fitting ", model_name, "...")
     m <- stan_model(file = stan_path)
-    fit <- sampling(m, data = data_list, chains = chains, cores = cores)
+    fit <- sampling(m, data = data_list, chains = chains, cores = cores, init = replicate(4, list(arrival_mu = rpois(n =1, lambda = 35)), simplify = FALSE))
     save(fit, m, file = fit_file)
     writeLines(current_hash, hash_file)
   } else {
@@ -211,9 +212,8 @@ loo_df <- as.data.frame(cmp) %>%
     se = se_diff
   )
 
-fit <- fit_m7
+fit <- fit_m8
 post <- rstan::extract(fit)
-post8 <- rstan::extract(fit_m8)
 ```
 
 # Introduction
@@ -308,7 +308,7 @@ arrived <- sapply(15:max(sp_dat$day), FUN = function(x) {
   mutate(type = "arrived")
 
 exited <- sapply(15:max(sp_dat$day), FUN = function(x) {
-  pnorm(x, post$arrival[,j] + post$exit_lag, post$exit_spread[,j]) * exp(post$log_run[,j])
+  pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j]) * exp(post$log_run[,j])
 }) %>% 
   as_tibble() %>%
   mutate(draw = row_number()) %>%
@@ -468,7 +468,7 @@ spawn_curves.df <- data.frame()
 for(j in 1:ncol(post$log_run)){
   live <- sapply(1:max(sp_dat$day), FUN = function(x) {
     entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
-    exited <- pnorm(x, post$arrival[,j] + post$exit_lag, post$exit_spread[,j])
+    exited <- pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j])
     
     exp(post$log_run[,j] + log(entered - (entered * exited)))
   })
@@ -499,7 +499,7 @@ effective_residence <- matrix(NA, nrow = length(post$arrival_mu), ncol = ncol(po
 for(j in 1:ncol(post$log_run)){
   live <- sapply(1:max(sp_dat$day), FUN = function(x) {
     entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
-    exited <- pnorm(x, post$arrival[,j] + post$exit_lag, post$exit_spread[,j])
+    exited <- pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j])
     
     entered * (1 - exited)
   })
