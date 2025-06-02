@@ -1,5 +1,5 @@
 ---
-title: Arrivals and Exits: A multi-level regression model to analyze visual surveys of spawning salmon.
+title: "Arrivals and Exits: A multi-level regression model to analyze visual surveys of spawning salmon"
 author:
   - name: Scott A. Akenhead 
     email: scott@s4s.com 
@@ -27,7 +27,7 @@ author:
 date: last-modified
 bibliography: bibliography.bib
 abstract: |
-  The abundance of spawning salmon is a fundamental variable for salmon management, but conventional methods do not estimate the precision of abundance and risk bias from an assumed residence time (to correct for observing a fish in repeated surveys). A new model estimates  timing and spread of both arrivals and exits of spawners. This model estimates of spawner residence time directly, removing a critical assumption. The model was challenged with simulated data to demonstrate robustness, and challenged with data from 291 surveys (25 years) of wild Sockeye Salmon (_Oncorhynchus nerka_) spawning in the Okanagan River (BC, Canada). Estimates of abundance were similar to conventional, but revealed relative precision. Despite how the timing and spread of arrival and exit varied between years, "effective residence" derived from our model was relatively constant and similar to the previous assumed value. Extensions to the ecology in this model could determine effects from spawner biometrics and habitat variables.
+  The abundance of spawning salmon is a fundamental variable for salmon management, but conventional methods do not estimate the precision of abundance and risk bias from an assumed residence time (to correct for observing a fish in repeated surveys). Here we present a new model that estimates spawner abundance by modelling the process and timing of spawner arrival and exit from the spawning ground. This model estimates spawner residence time directly, removing a critical assumption from traditional methods. We first demonstrate how the model is able to accurately estimate parameters from simulated data. Then, we demonstrate its application in estimating 25 years of spawner abundance of wild sockeye salmon (_Oncorhynchus nerka_) in the Okanagan River (BC, Canada). Our median estimated residence time of 10.3 days is similar to the 11 days that has been previously assumed for this population. Thus, our total estimated spawner abundances are similar to what has been estimated using a trapezoidal area under the curve with an assumed residence time. However, despite congruence in this population, assumed residence time has potential to greatly bias spawner abundance estimates. Our model addresses this by estimating it directly from the data, and additionally provides estimates of uncertainty, which are important advancements over conventional approaches.
 
 keywords: 
   - salmon
@@ -211,18 +211,20 @@ loo_df <- as.data.frame(cmp) %>%
     se = se_diff
   )
 
-fit <- fit_m7
+fit <- fit_m8
 post <- rstan::extract(fit)
-post8 <- rstan::extract(fit_m8)
 ```
 
 # Introduction
 
 ## The importance of spawner surveys
 
-Spawner abundance is a key variable in salmon ecology. Functions relating spawners to their offspring that return as adults ("stock" and "recruits") are fundamental for management of salmon fisheries and salmon habitats [@ricker1975; @hilborn1992].
+Spawner abundance is a key variable in salmon ecology. Functions relating spawners to their offspring that return as adults ("stock" and "recruits") are fundamental for management of salmon fisheries and salmon habitats [@ricker1975; @hilborn1992]. For salmon, spawner abundance in a river, stream, or lake beach is typically estimated through repeated visual surveys---for example, from a boat, a helicopter, a drone, or while snorkelling, or walking---that count the number of spawners present across multiple days in the spawning period. However, converting these repeat survey counts into an estimate of total spawner abundance requires adjusting for the fact that spawning fish typically spend multiple days (e.g., 8.8-187 days for sockeye salmon; @perrin1990) on the spawning grounds. 
 
-Estimates of the number of Sockeye Salmon (*Oncorhynchus nerka* Walbaum 1792) spawners in a river or a lake beach involve repeated surveys during the spawning period. Methods vary; conventionally by visual counts while boating, snorkeling, walking, or flying in a helicopter or small airplane; and recently analyzing video from drones. There are many other methods to estimate spawner abundance: mark-recapture, conductivity sensors, counting fences, eDNA, and these methods are frequently combined @parsons2010. Complications include distinguishing hatchery fish from wild, and separating anadromous Sockeye from non-anadromous Kokanee (sub-species of *O. nerka*).
+The conventional method for estimating spawner abundance based on repeat visual surveys calculates the area under the curve (AUC; @ames1977, @perrin1990). This AUC is the integral of the spawner counts over the spawning season and is divided by an assumed residence time (also called survey life)---the average number of days an individual spawner remains in the survey area--- which is estimated independently. Residence times have been found to vary across years and across spawning grounds and so it is recommended that annual, spawning-ground specific estimates should be used because  (@bocking1998; @perrin1990; @irvine1992). There are a range of methods for estimating residence time, but all have limitations (reviewed in @perrin1990). However, because estimating residence time is difficult and requires additional surveying, they are often assumed, sometimes based on similarity between populations (e.g., @hyatt2010). But, because residence time acts as a scalar on the survey counts, it can introduce substantial bias to the resulting total spawner abundance estimates if the estimated value is incorrect.
+
+
+Estimates of the number of sockeye salmon (*Oncorhynchus nerka*) spawners in a river or a lake beach involve repeated surveys during the spawning period. Methods vary; conventionally by visual counts while boating, snorkeling, walking, or flying in a helicopter or small airplane; and recently analyzing video from drones. There are many other methods to estimate spawner abundance: mark-recapture, conductivity sensors, counting fences, eDNA, and these methods are frequently combined @parsons2010. Complications include distinguishing hatchery fish from wild, and separating anadromous Sockeye from non-anadromous Kokanee (sub-species of *O. nerka*).
 
 The conventional analysis of a survey of sockeye spawners determines **AUC**, the integral of spawner count over a number of surveys). Using an assumed value for residence time changes the absolute number of spawners in each survey to an index of relative abundance @askey2023. There are three approaches to estimating the abundances of sockeye spawners from visuals surveys\> AUC:
 
@@ -293,7 +295,7 @@ ggplot(example_data, aes(x = day + day_stand, y = spawners, group = type))+
                        paste0(as.integer(format(as.Date(.x, origin = "2023-12-31"), "%d"))),
                      breaks = as.numeric(as.Date(c("2024-09-15", "2024-10-01", "2024-10-15", "2024-11-01", "2024-11-15")) - as.Date("2023-12-31")), 
                      name = "", expand = c(0, 0))+
-  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners (thousands)", expand = expansion(mult = c(0, 0)), limits = c(0, 1.3e5))+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners (thousands)", expand = expansion(mult = c(0, 0)), limits = c(0, 1.3e5), breaks = seq(0, 1.25e5, by = 0.25e5))+
   geom_point(data = index_sk %>% filter(year == 2024), aes(x = yday, y = live, group = NA))+
     #geom_textsegment(data = residence_df, aes(x = x_start, xend = x_end, y = y_value, yend = y_value, label = "residence"), linewidth = 0.5, inherit.aes = FALSE, size = 2.8, family = "sans")+
   annotate("text",
@@ -485,7 +487,7 @@ effective_residence <- matrix(NA, nrow = length(post$arrival_mu), ncol = ncol(po
 for(j in 1:ncol(post$log_run)){
   live <- sapply(1:max(sp_dat$day), FUN = function(x) {
     entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
-    exited <- pnorm(x, post$arrival[,j] + post$exit_lag, post$exit_spread[,j])
+    exited <- pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j])
     
     entered * (1 - exited)
   })
