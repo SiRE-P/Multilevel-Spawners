@@ -1,0 +1,440 @@
+---
+title: "plt_sim version 3"
+author: "JLT, SAA"
+date: today
+format: pdf
+execute:
+   output: hold
+   echo: false
+---
+
+### History  
+-   From plt_sim_v2.qmd 2025-06-14
+-   From plt_sim.R      2025-05-29
+
+```{r}
+#| label: setup
+#| echo: false
+#| warning: false
+library(tidybayes); library(tidyverse); library(scales); library(rstan); 
+library(magrittr); library(patchwork);  library(knitr); 
+options(mc.cores = parallel::detectCores()) # 8 cores
+rstan_options(auto_write = TRUE) 
+# set.seed(123) 
+```
+
+# Simulation
+
+**Goal:** Automate multiple simulations to demonstrate annual values of *run size* and spawning parameters (*arrival_timing, arrival_spread, exit_lag, exit_spread*) are recovered by fitting model spawner_m8.stan. All four spawning params as groups (multi-level regression) of annual values.
+
+## Simulation parameters  
+Assign distributions to parameters for runs and spawner behaviour. Set years and days for surveys. Params logged or not as per JLT code: spawners_m8.stan
+
+```{r}
+#| label: parameters
+#| echo: true
+log_run_mu               <-  10  # log value for lognormal PDD, 
+log_run_sigma            <-   1  # log value for lognormal PDD, 
+arrival_timing_mu        <-  35  # normal  
+arrival_timing_sigma     <-   5  
+arrival_spread_mu        <-   5    # lognormal
+arrival_spread_sigma     <-   1.35 # log value was 0.3
+exit_lag_mu              <-  10    # lognormal
+exit_lag_sigma           <-   1.35 # log value was 0.3
+exit_spread_mu           <-   5    # lognormal
+exit_spread_sigma        <-   1.35 # log value was 0.3
+rnbinom_size             <-  10    # sampling error
+years_n                  <-  12    # 4x3 plot
+days_n                   <- 100    # checked below
+pct_surveyed             <-   0.9  # runif frac days sampled
+# derived
+days      <- 1:days_n
+years     <- 1:years_n
+
+# check range for days. pnorm(2.326348) = 99% 
+k99 = qnorm(0.99,0,1)
+day_first=arrival_timing_mu -
+  k99*(arrival_spread_mu+k99*arrival_spread_sigma)
+day_last=arrival_timing_mu +
+  k99*(arrival_spread_mu+k99*arrival_spread_sigma) +
+  exit_lag_mu + 
+  k99*(exit_lag_sigma+exit_spread_mu+k99*exit_spread_sigma)
+cat("Range of days with spawners conceivably present:", round(day_first),'to',round(day_last),'\n') 
+```
+
+## Draws for annual values  
+Draw random samples for annual runs and spawning params. Spawners present each day is cumulative arrived minus cumulative exited based on those draws.
+
+```{r}
+#| label: draws
+p95 = c(0.025,0.975)
+# run was N_total in prev. version
+run <- rlnorm(years_n,  log_run_mu, log_run_sigma) %>% round
+CL95 = qlnorm(p95,log_run_mu, log_run_sigma) %>% round
+cat('\n run 95%CL:', CL95, '\n    draws:', run, '\n') 
+arrival_timing <- rnorm(years_n, arrival_timing_mu, arrival_timing_sigma) %>% round(2)
+CL95 = qnorm(p95,arrival_timing_mu, arrival_timing_sigma)%>% round(2)
+cat('arrival_timing  95%CL:',CL95, '\n    draws:', arrival_timing, '\n') 
+arrival_spread <- rlnorm(years_n,log(arrival_spread_mu),log(arrival_spread_sigma))  %>% round(2)
+CL95 = qlnorm(p95,log(arrival_spread_mu), log(arrival_spread_sigma)) %>% round(2)
+cat('arrival_spread  95%CL:', CL95, '\n    draws:', arrival_spread, '\n') 
+exit_lag <- rlnorm(years_n, log(exit_lag_mu), log(exit_lag_sigma))%>% round(2)
+CL95 = qlnorm(p95,log(exit_lag_mu),log(exit_lag_sigma)) %>% round(2)
+cat('exit_lag  95%CL:',CL95, '\n    draws:', exit_lag, '\n') 
+exit_spread <- rlnorm(years_n,log(exit_spread_mu), log(exit_spread_sigma)) %>% round(2)
+CL95 = qlnorm(p95,log(exit_spread_mu), log(exit_spread_sigma) ) %>% round(2)
+cat('exit_spread  95%CL:',CL95, '\n    draws:', exit_spread, '\n') 
+
+# apply annual draws for to simulate spawners present. one vector
+present <- sapply(1:years_n, function(i){
+  entered <- pnorm(days, arrival_timing[i],          arrival_spread[i])
+  exited  <- pnorm(days, arrival_timing[i]+exit_lag[i], exit_spread[i])
+  present <- (entered * (1-exited) * run[i]) 
+})
+
+dat_sim = data.frame(
+  year    = rep(years,each=days_n),
+  day     = rep(days,years_n),
+  present = present%>% as.vector %>% round)
+```
+
+```{r}
+#| label: fig-present
+#| fig-cap: Time series of spawners present in each year.
+ggplot(dat_sim, aes(day, 1e-3*present, color=factor(year) )) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  geom_line() +
+  scale_color_brewer(palette = "Paired") +  # only 12 colors in this palette
+  labs(x="Day",y="Spawners Present ('000)")+
+  theme(legend.position = "none") 
+
+```
+
+## Surveys  
+Define surveys as a random fraction of all days. Add negative binomial sampling error. Remove simulated values of zero and sampled observations of zero.
+
+```{r}
+#| label: surveyed
+# apply sampling error
+dat_sim %<>% within({sampled <- rnbinom(n=days_n*years_n, mu=present, size=rnbinom_size)})
+
+# delete 10% of days randomly. leaves same samples_n each year.
+sampled.df <- dat_sim %>% group_by(year) %>%
+  slice_sample(prop = pct_surveyed)  # re-ordered randomly
+
+# delete present = 0 and sampled = 0
+sampled.df2 <- sampled.df %>% filter((sampled > 0) & (present > 0))
+# gaps?
+noquote('max gap each year: ')
+by(sampled.df2$day,sampled.df2$year, function(x) max(diff(sort(x))-1) ) %>% as.vector %>% print
+```
+
+```{r}
+#| label: fig-samplError
+#| fig-cap: Comparison of spawner observed to spawners present. Note log(0) = 1. 
+#| fig-subcap: Sampling error is negative binomial. Note log(0) = 1.
+p1 <- ggplot(sampled.df2, aes(present, sampled)) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  geom_point(size=0.33) +
+  geom_abline(slope=1, intercept=0, color='red') +
+  labs(x="Simulated",y="Observed")
+p2 <- ggplot(sampled.df2, aes(log10(present), log10(sampled)) ) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  geom_point(size=0.33)+
+  geom_abline(slope=1, intercept=0, color='red') +
+  labs(x="log_10 Simulated",y="log_10 Observed")
+p1+p2  # patchwork for plots layout
+#ggsave('sampled_df.pdf',width=7, height=7)
+```
+
+## Observed time series  
+Plotted as observed to show scatter near peak (mode) day and as logs to better show negative skew when arrival_spread is greater than exit_spread (typical), and positive skew when smaller. 
+```{r}
+#| label: fig-sampled
+#| fig-cap: Annual time series of spawners observed.
+ggplot(sampled.df2, aes(x = day, y = 1e-3*sampled)) + theme_bw() +
+  theme(panel.grid.minor = element_blank()) +
+  geom_point(size=0.5) +
+  labs(x="Day",y="Sampled ('000)") +
+  facet_wrap(~year, scales='free_y') +
+  theme(panel.grid.minor = element_blank()) +
+  theme(strip.background = element_rect(color="NA", fill="NA"))
+
+```
+
+```{r}
+#| label: fig-logSampled
+#| fig-cap: Annual time series, logged, of spawners observed.
+#| fig-subcap: Reveals skewed distributions.
+ggplot(sampled.df2, aes(x = day, y = log10(sampled))) + theme_bw() +
+  geom_point(size=0.5) +
+  labs(x="Day",y="Sampled (log_10)") +
+  facet_wrap(~year, scales='free_y') +
+  theme(panel.grid.minor = element_blank()) +
+  theme(strip.background = element_rect(color="NA", fill="NA"))
+
+```
+
+## Fit
+
+## Priors for Stan  
+Bayesian priors affect Markov Chain Monte Carlo (or related) sampling of the parameters hyperspace. The spawning parameters: *arrival_timing, arrival_spread, exit_lag, exit_spread*  are treated as multilevel, groups of annual values. Priors fo a group define an initial distribution for the annual values: *exit_lag* $= \Phi (\mu,\sigma)$ has group parameters *exit_lag_mu* and *exit_lag_sigma*. Annual values are sampled (fitted) from the group distribution, and group parameters are simultaneously fitted, thereby "sharing information" to improve the fit for each annual value. Note *log_runs* is not a group, the same prior applies to each year.
+
+In what follows, the prior *exit_lag_sigma* uses the value for *spread_sigma.* The Stan code renames *count_dispersion* as *log(live_phi)* where *live_phi* is the size parameter for the negative binomial distribution.
+
+```{r}
+#| label: tbl-priors
+#| tbl-cap: Priors for Stan sampling of parameters space.
+priors <- data.frame(
+  prior = c("log_runs_mu", "arrival_mu", "arrival_sigma", "spread_mu","spread_sigma","exit_lag_mu", "count_dispersion"),
+  pdd=c('lnorm','norm','exp','norm','exp','norm','norm'),
+  v1 = c(10, 40,  0, 5, 0, 10,   1),
+  v2 = c( 1,  5, 10, 1, 5,  2, 0.2))
+priors <- data.frame(
+  prior = c("log_runs_mu", "arrival_mu", "arrival_sigma", "spread_mu","spread_sigma","exit_lag_mu", "count_dispersion"),
+  pdd=c('lnorm','norm','gamma','lnorm','gamma','lnorm','lnorm'),
+  v1 = c(10, 40,  8, log(8-1), 2, log(10),   2),
+  v2 = c( 1,  5,  2, 0.3, 1,  0.3, 0.5))
+kable(priors,digits=3)
+
+```
+
+## Data list for Stan  
+The priors are part of the Stan data list. Convergence of the HMC sampling chains is improved by providing initial values for *arrival_mu*. .
+
+```{r}
+#| label: tbl-stanDat
+#| echo: true
+
+sp_dat = list(
+  n_priors     = nrow(priors),
+  priors      = data.matrix(priors[,3:4]),
+  n_years     = years_n, 
+  n_obs       = nrow(sampled.df2),
+  year        = sampled.df2$year, 
+  day         = sampled.df2$day,
+  live_counts = sampled.df2$sampled,
+  live_phi    = rnbinom_size,        # 10
+  arrival_mu  = arrival_timing_mu )  # 35
+```
+
+## Stan sampling
+
+```{r}
+#| label: stan
+mod <- stan_model("../stan/spawners_m8_beta.stan")
+z <- Sys.time()
+fit <- sampling(mod, data = sp_dat,
+                chains = 4, cores = 4, iter=600, warmup=500,
+                init = replicate(4, list(arrival_mu = rpois(1, 40)), simplify = FALSE))
+print(paste0('elapsed time:', format(Sys.time() - z) ))
+
+traceplot(fit, pars=c(
+  "arrival_mu","arrival_sigma", "arrival_spread_mu", "arrival_spread_sigma")) +
+  theme(legend.position = "none") 
+
+traceplot(fit, pars=c(
+  "exit_spread_mu", "exit_spread_sigma","exit_lag_mu", "exit_lag_sigma")) +
+  theme(legend.position = "none") 
+
+traceplot(fit, pars=c( "log_run[1]","arrival[1]", "arrival_spread[1]", "exit_spread[1]", "exit_lag[1]") ) +
+  theme(legend.position = "none") 
+
+post <- rstan::extract(fit) # one several R versions of extract()
+```
+
+## Fitted runs  
+Spawner abundance estimates presented logged and arith***met***ic plots. log_10 / log_e = 0.4342945
+
+```{r}
+#| label: fittedRuns
+run_fit <- spread_draws(fit, log_run[year]) %>%
+  filter(.chain %in% c(3:4))
+p1 <- ggplot(run_fit, aes(x = year, y = exp(log_run))) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  stat_pointinterval(.width=c(0.50, 0.95),fatten_point = 1.0) +
+  labs(x="Year", y= "Run") +
+  geom_point(data = data.frame(
+    year = years, log_run = log(run) ),
+    color = 2)
+p2 <- ggplot(run_fit, aes(x = year, y = 0.4343*log_run))+
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  stat_pointinterval(.width=c(0.50, 0.95),fatten_point = 1.0) +
+  labs(x="Year", y= "log_10 Run") +
+  geom_point(data = data.frame(
+    year = years, log_run = log10(run)), 
+    aes(x=year, y=log_run), color = 2)
+p1+p2
+```
+
+### Fitted parameters  
+The annual values for spawner *arrival_timing, arrival_spread, exit_lag*, and *exit_spread* are presented as marginal posterior distributions (confidence limits) and compared to the simulated value. The goal is finding any consistent bias.
+
+
+```{r}
+#| label: postvprior
+
+true_values <- data.frame(
+  .variable = c("arrival_mu", "arrival_sigma",
+                "arrival_spread_mu", "arrival_spread_sigma",
+                "exit_spread_mu", "exit_spread_sigma",
+                "exit_lag_mu", "exit_lag_sigma",
+                "live_phi"),
+  .value = c(
+    arrival_timing_mu,
+    arrival_timing_sigma,
+
+    log(arrival_spread_mu - 1),
+    log(arrival_spread_sigma),
+
+    log(exit_spread_mu - 1),
+    log(exit_spread_sigma),
+
+    log(exit_lag_mu - 1),
+    log(exit_lag_sigma),
+
+    rnbinom_size
+  )
+)
+
+data.frame(type = "prior", 
+           arrival_mu = rnorm(4000, sp_dat$priors[2,1], sp_dat$priors[2,2]),
+           arrival_sigma = rgamma(4000, sp_dat$priors[3,1], sp_dat$priors[3,2]),
+           arrival_spread_mu = rnorm(4000, sp_dat$priors[4,1], sp_dat$priors[4,2]),
+           arrival_spread_sigma = rexp(4000, sp_dat$priors[5,2]),
+           exit_spread_mu = rnorm(4000, sp_dat$priors[4,1], sp_dat$priors[4,2]),
+           exit_spread_sigma = rexp(4000, sp_dat$priors[5,2]),
+           exit_lag_mu = rnorm(4000, sp_dat$priors[6,1], sp_dat$priors[6,2]),
+           exit_lag_sigma = rexp(4000, sp_dat$priors[5,2]),
+           live_phi = exp(rnorm(4000, sp_dat$priors[7,1], sp_dat$priors[7,2]))) %>% 
+          gather(key = .variable, value = .value, -type) %>% 
+  bind_rows(gather_draws(fit, arrival_mu, arrival_sigma,arrival_spread_mu, arrival_spread_sigma, exit_spread_mu, exit_spread_sigma, exit_lag_mu, exit_lag_sigma, live_phi) %>% 
+  mutate(type = "posterior")) %>% 
+  #bind_rows() %>% 
+  ggplot(aes(x = .value, color = type))+
+  geom_density()+
+  geom_vline(data = true_values, aes(xintercept = .value), lty = 2)+
+  facet_wrap(~.variable, scales = "free")+
+  theme_bw()
+```
+
+
+```{r}
+#| label: fittedParams
+drawns = data.frame(years, arrival_timing,arrival_spread, exit_lag, exit_spread)
+
+p1 <- spread_draws(fit, arrival[year]) %>% 
+  ggplot( aes(x=year, y=arrival)) + 
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  stat_pointinterval(.width=c(0.50, 0.95),fatten_point = 1.0) +
+  geom_point(data=drawns,aes(x=years,y=arrival_timing),color=2) +
+  labs(x="Year", y="Arrival Timing")
+
+p2 <- spread_draws(fit, arrival_spread[year]) %>% 
+  ggplot(aes(x=year, y=arrival_spread)) + theme_bw() +
+  theme(panel.grid.minor = element_blank()) +
+  stat_pointinterval(.width=c(0.50, 0.95),fatten_point = 1.0) +
+  geom_point(data=drawns,aes(x=years,y=arrival_spread),color=2) +
+  labs(x="Year", y="Arrival Spread")
+
+p3 <- spread_draws(fit, exit_lag[year]) %>% 
+  ggplot(aes(x=year, y=exit_lag)) + theme_bw() +
+  theme(panel.grid.minor = element_blank()) +
+  stat_pointinterval(.width=c(0.50, 0.95),fatten_point = 1.0) +
+  geom_point(data=drawns,aes(x=years,y=exit_lag),color=2) +
+  labs(x="Year", y="Exit Lag")
+
+p4 <- spread_draws(fit, exit_spread[year]) %>% 
+  ggplot(aes(x=year, y=exit_spread)) + theme_bw() +
+  theme(panel.grid.minor = element_blank()) +
+  stat_pointinterval(.width=c(0.50, 0.95),fatten_point = 1.0) +
+  geom_point(data=drawns,aes(x=years,y=exit_spread),color=2) +
+  labs(x="Year", y="Exit Spread")
+
+p1+p2+p3+p4
+
+```
+
+## Spawner presence  
+The pattern of spawner distribution is recreated from the fitted parameters and presented with 95% confidence limits. This is compared to the observations withsampling error.
+
+```{r}
+#| label: spawnCurves
+
+spawn_curves.df <- data.frame()
+for(j in 1:ncol(post$log_run)){
+  live <- sapply(1:days_n, FUN = function(x) {
+    entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
+    exited  <- pnorm(x, post$arrival[,j] + post$exit_lag[j],
+                     post$exit_spread[,j])
+    exp(post$log_run[,j] + log(entered - (entered * exited)))
+  })
+  
+  spawn_curves.df <- bind_rows(spawn_curves.df,
+                               data.frame(year = j,
+                                          day  = 1:days_n,
+                                          fish = apply(live, 2, median),
+                                          l95  = apply(live, 2, quantile, probs = 0.025),
+                                          u95  = apply(live, 2, quantile, probs = 0.975)))
+}
+```
+
+```{r}
+#| label: fig-spawnCurves
+#| fig-cap: Estimated spawner presence, with 95% CL, from fitted parameters. Observed values are points.
+
+ggplot(spawn_curves.df, aes(x = day, y = fish))  + theme_bw() +
+  geom_line()+
+  geom_ribbon(aes(ymin = l95, ymax = u95), color = NA, alpha = 0.2)+
+  facet_wrap(~year, scales = "free_y") +
+  geom_point(data = sampled.df2, aes(x = day, y = sampled), size = 0.8) +
+  scale_y_continuous(
+    labels = label_number(scale = 1e-3, suffix = "k"),
+    name = "Spawners present ('000)", expand = expansion(mult = c(0, 0.02))) +
+  theme(strip.background = element_rect(color="NA", fill="NA"))+
+  scale_x_continuous(
+    labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b"),
+    breaks = as.numeric(as.Date(c("2024-09-01", "2024-10-01", "2024-11-01")) - as.Date("2023-12-31")), name = "") +
+  theme(panel.grid.minor = element_blank())
+
+ggsave('spawn_curves.pdf',width=14, height=14)
+
+```
+
+## Stats  
+For comparison of scenarios of survey quality. Uses median absolute difference (*MAD*) from log (observed) - log (expected). It is faster to compute log (observed/expected). The many samples representing the posterior PDD for observed are reduced to median. mad(x) expands the value by 1.4826 to be the same as 1 stdev if x is a normal distribution. A mad of 0.16 is an accuracy of16%, implying 95%CL is $\pm  2~ \times  \text{ MAD } = 68\% \text{ to } 132\%$.
+
+```{r}
+#| label: tbl-mad
+#| tbl-cap: Statistics of annual parameters as ratios, each year's fitted median divided by the annual draw for that parameters before sampling error. Values for all years are summarized as median, to show bias, and mad (median absolute difference) to show precision. 
+meds = summary(fit)$summary[c(1:21,70:119), 6]  # vector, medians
+meds = data.frame(
+  log_run        = meds[10:21],
+  arrival_timing = meds[22:33],
+  arrival_spread = meds[34:45],
+  exit_spread    = meds[46:57],
+  exit_lag       = meds[58:69])
+ratios = data.frame(
+  Parameter=c('Run', 'Arrival Timing', 'Arrival Spread', 'Exit Lag', 'Exit Spread'),
+  Median = c(
+    median(exp(meds[,1]) / run),
+    median(meds[,2] / arrival_timing),
+    median(meds[,3] / arrival_spread),
+    median(meds[,5] / exit_lag),
+    median(meds[,4] / exit_spread) ),
+  MAD = c(
+    mad(exp(meds[,1]) / run),
+    mad(meds[,2] / arrival_timing),
+    mad(meds[,3] / arrival_spread),
+    mad(meds[,5] / exit_lag),
+    mad(meds[,4] / exit_spread) ) )
+rat_tab = data.frame(
+  Parameters = ratios$Parameter,
+  Median = ratios$Median %>% `*`(100) %>% round %>% paste('%',sep=''),
+  MAD =    ratios$MAD    %>% `*`(100) %>% round %>% paste('%',sep='') )
+CL_1 = (1-2*ratios$MAD) %>% `*`(100) %>% round %>% paste('%',sep='')
+CL_2 = (1+2*ratios$MAD) %>% `*`(100) %>% round %>% paste('%',sep='')
+rat_tab$CL95 = paste(CL_1, CL_2, sep = ' to ' )
+kable(rat_tab)
+rm(meds)
+```
