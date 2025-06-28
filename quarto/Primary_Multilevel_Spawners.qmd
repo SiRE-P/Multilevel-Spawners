@@ -12,6 +12,15 @@ author:
           state: BC, Canada
           postal-code: V9T 6N7
     note: (retired).
+  - name: Colette Louie
+    email: CLouie@oib.ca
+    affiliations:
+        - id: OIB
+          name: Osooyos Indian Band
+          address: 1155 Sen Pok Chin Blvd
+          city: Oliver
+          state: BC, Canada
+          postal-code: V0H 1T3
   - name: Patrick L. Thompson
     email: patrick.thompson@dfo-mpo.gc.ca
     affiliations:
@@ -117,7 +126,7 @@ day_stand <- min(index_sk$yday)
 
 priors <- data.frame(prior = c("log_runs_mu", "arrival_mu", "arrival_sigma", "spread","spread_sigma","residence", "count_dispersion"),
                      v1 = c(10,280-day_stand, 0,log(8-1), 0,log(11-1), 1), 
-                     v2 = c(1,5,2,0.2, 10, 0.3, 0.2))
+                     v2 = c(1,2,1,0.2, 10, 0.3, 0.2))
 
 
 sp_dat = list(n_priors = nrow(priors), 
@@ -255,7 +264,7 @@ arrived <- sapply(15:max(sp_dat$day), FUN = function(x) {
   mutate(type = "arrived")
 
 exited <- sapply(15:max(sp_dat$day), FUN = function(x) {
-  pnorm(x, post$arrival[,j] + post$exit_lag, post$exit_spread[,j]) * exp(post$log_run[,j])
+  pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j]) * exp(post$log_run[,j])
 }) %>% 
   as_tibble() %>%
   mutate(draw = row_number()) %>%
@@ -265,7 +274,7 @@ exited <- sapply(15:max(sp_dat$day), FUN = function(x) {
 
 counts <- sapply(15:max(sp_dat$day), FUN = function(x) {
   entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
-  exited <- pnorm(x, post$arrival[,j] + post$exit_lag, post$exit_spread[,j])
+  exited <- pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j])
   
   exp(post$log_run[,j] + log(entered - (entered * exited)))
 }) %>% 
@@ -282,7 +291,7 @@ example_data <- bind_rows(arrived, exited, counts) %>%
             spawners = median(spawners))
 
 mean_arrival_day <- median(post$arrival[,j])
-median_residence <- median(post$exit_lag)
+median_residence <- median(post$exit_lag[,j])
 y_value <- median(pnorm(mean_arrival_day, post$arrival[,j], post$arrival_spread[,j]) * exp(post$log_run[,j]))
 x_start <- mean_arrival_day + day_stand
 x_end <- mean_arrival_day + median_residence + day_stand
@@ -553,7 +562,7 @@ spread_draws(fit, arrival[year]) %>%
   ggplot(aes(x = year, y = mean_residence))+
   stat_pointinterval()+
   geom_hline(yintercept = 11, lty = 2)+
-  scale_y_continuous(breaks = seq(1, 19, by = 2))+
+  scale_y_continuous(breaks = seq(1, 30, by = 3))+
   ylab(bquote("Mean residence (" * mu[y]^residence * ")"))+
   theme_bw()+
   
