@@ -85,7 +85,7 @@ model {
   
   // simple PDD
   log_run ~ normal(priors[1,1], priors[1,2]);  // mean  run log
-  log(live_phi)   ~ normal(priors[7,1], priors[7,2]);
+  live_phi   ~ exponential(priors[7,2]);
   
   
   //likelihood
