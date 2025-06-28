@@ -246,7 +246,7 @@ sp_dat = list(
 mod <- stan_model("../stan/spawners_m8_beta.stan")
 z <- Sys.time()
 fit <- sampling(mod, data = sp_dat,
-        chains = 4, cores = 4, iter=600, warmup=500,
+        chains = 4, cores = 4, iter=1200, warmup=1000,
         init = replicate(4, list(arrival_mu=runif(1,30,40)), simplify=FALSE)) # was rpois(1, 40))
 print(paste0('elapsed time:', format(Sys.time() - z) ))
 post <- rstan::extract(fit) # one several R versions of extract()
