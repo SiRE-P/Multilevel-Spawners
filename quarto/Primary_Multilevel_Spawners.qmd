@@ -460,7 +460,7 @@ spawn_curves.df <- data.frame()
 for(j in 1:ncol(post$log_run)){
   live <- sapply(1:max(sp_dat$day), FUN = function(x) {
     entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
-    exited <- pnorm(x, post$arrival[,j] + post$exit_lag, post$exit_spread[,j])
+    exited <- pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j])
     
     exp(post$log_run[,j] + log(entered - (entered * exited)))
   })
