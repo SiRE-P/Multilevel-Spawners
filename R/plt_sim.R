@@ -1,6 +1,7 @@
 library(tidyverse)
 library(rstan)
 library(tidybayes)
+library(scales)
 set.seed(123)
 
 log_run_mu <- 10
@@ -9,13 +10,13 @@ arrival_spread_mu <- 5
 exit_spread_mu <- 5
 exit_lag <- 10
 
-years <- 10
+years <- 20
 N_total <- round(rlnorm(years, log_run_mu, 1))
 
-arrival <- rnorm(years, arrival_mu, 5) 
-arrival_spread <- rlnorm(years, log(arrival_spread_mu), 0.3)
-exit_spread <- rlnorm(years, log(exit_spread_mu), 0.3)
-exit_lag <- rlnorm(years, log(exit_lag), 0.3)
+arrival <- rnorm(years, arrival_mu, 2) 
+arrival_spread <- rnorm(years, arrival_spread_mu, 1)
+exit_spread <- rnorm(years, exit_spread_mu, 0.5)
+exit_lag <- rnorm(years, exit_lag, 1)
 
 output <- sapply(1:years, function(i){
   x <- 1:100
@@ -27,43 +28,101 @@ output <- sapply(1:years, function(i){
 
 matplot(output, type = 'l')
 
-full_surveyed.df <- data.frame(N = round(c(output)), sampled = rnbinom(n = length(output), mu = output, size = 10), year = rep(1:years, each = 100), day = 1:100)
+full_surveyed.df <- data.frame(N = round(c(output)), sampled = rnbinom(n = length(output), mu = output, size = 2), year = rep(1:years, each = 100), day = 1:100)
 
-sampled.df <- full_surveyed.df %>% 
-  group_by(year) %>% 
-  sample_frac(size = 0.9)
-
-ggplot(sampled.df, aes(x = day, y = sampled))+
+ggplot(full_surveyed.df, aes(x = day, y = sampled))+
   geom_point()+
-  facet_wrap(~year)
+  facet_wrap(~year, scale = "free_y")
 
-sampled.df2 <- sampled.df %>% 
-  filter(sampled >0)
+sampling_freq <- seq(1, 11, by = 2)
+
+subsample_accuracy <- data.frame()
+for(i in 1:length(sampling_freq)){
+  df_subsampled <- full_surveyed.df %>%
+    group_by(year) %>%
+    arrange(day) %>%
+    mutate(row = row_number()) %>%
+    filter(sampling_freq[i] == 1 | row %% sampling_freq[i] == 1) |> 
+    ungroup() %>%
+    select(-row) |> 
+    filter(sampled>0)
+  
+  trad_AUC <- df_subsampled %>%            
+    group_by(year) %>%   
+    mutate(tdiff = day - lag(day),                      
+           tdiff = replace(tdiff, which(tdiff < 0), NA),
+           xbar = (sampled + lag(sampled))/2, 
+           fishdays = case_when(                          
+             is.na(xbar) ~ sampled   * 11/2,         
+             !is.na(xbar) ~ as.numeric(tdiff) * xbar
+           ),
+           cumulative = cumsum(fishdays)) %>%  
+    group_by(year) %>%     
+    summarise(total_auc = max(cumulative, na.rm = TRUE) +
+                (sampled[which.max(day)]*(11/2)), #this adds in the right tail.
+              nerkids = round(total_auc/11,0))
+  
+  diff <- N_total - trad_AUC$nerkids
+  
+  priors <- data.frame(prior = c("log_runs_mu", "arrival_mu", "arrival_sigma", "spread","spread_sigma","residence", "count_dispersion"),
+                       v1 = c(10,40, 0, log(8-1), 0,log(11-1), 1), 
+                       v2 = c(1, 2, 1, 0.2, 2, 0.3, 0.2))
+  
+  sp_dat = list(n_priors = nrow(priors), 
+                priors = data.matrix(priors[,-1]),
+                n_years = max(df_subsampled$year),
+                year = as.numeric(factor(df_subsampled$year)),
+                day = df_subsampled$day,
+                n_obs = nrow(df_subsampled),
+                live_counts = df_subsampled$sampled, 
+                arrival_mu = arrival_mu)
+  
+  
+  mod <- stan_model("./stan/spawners_m8.stan")
+  fit <- sampling(mod, data = sp_dat, chains = 4, cores = 4, iter = 500, seed = 7, init = replicate(4, list(arrival_mu = 35), simplify = FALSE))
+  
+  mod_est <- spread_draws(fit, log_run[year]) |> 
+    mutate(run = exp(log_run)) |> 
+    group_by(year) |> 
+    summarise(run = median(run))
+  
+  
+  mod_diff <- N_total - mod_est$run
+  
+  subsample_accuracy <- rbind(subsample_accuracy, data.frame(sample_freq = sampling_freq[i], 
+                                                             type = c("TAUC", "model"),
+                                                             perc_accuracy = c(median(1-abs(diff)/trad_AUC$nerkids), median(1-abs(mod_diff)/trad_AUC$nerkids))))
+}
+
+subsample_accuracy |> 
+  ggplot(aes(x = sample_freq, y = perc_accuracy, color = type))+
+  geom_line()
+
+
+
 
 priors <- data.frame(prior = c("log_runs_mu", "arrival_mu", "arrival_sigma", "spread","spread_sigma","residence", "count_dispersion"),
-                     v1 = c(10,40, 0,log(8-1), 0,log(11-1), 1), 
-                     v2 = c(1,5,10,0.2, 5, 0.3, 0.2))
+                     v1 = c(10,40, 0,log(8-1), 0, log(11-1), 1), 
+                     v2 = c(1,2,1,0.2, 1, 0.3, 0.2))
 
 sp_dat = list(n_priors = nrow(priors), 
               priors = data.matrix(priors[,-1]),
-              n_years = max(sampled.df2$year),
-              year = as.numeric(factor(sampled.df2$year)),
-              day = sampled.df2$day,
-              n_obs = nrow(sampled.df2),
-              live_counts = sampled.df2$sampled, 
-              live_phi = 10,
+              n_years = max(df_subsampled$year),
+              year = as.numeric(factor(df_subsampled$year)),
+              day = df_subsampled$day,
+              n_obs = nrow(df_subsampled),
+              live_counts = df_subsampled$sampled, 
               arrival_mu = arrival_mu)
 
 
 mod <- stan_model("./stan/spawners_m8.stan")
-fit <- sampling(mod, data = sp_dat, chains = 4, cores = 4, iter = 500, seed = 7, init = replicate(4, list(arrival_mu = 35), simplify = FALSE))
+fit <- sampling(mod, data = sp_dat, chains = 4, cores = 4, iter = 2000, seed = 7, init = replicate(4, list(arrival_mu = 35), simplify = FALSE))
 
 traceplot(fit)
 
 post <- extract(fit)
 
 spread_draws(fit, log_run[year]) %>% 
-  filter(.chain %in% c(3:4)) %>% 
   ggplot(aes(x = year, y = exp(log_run)))+
   stat_pointinterval()+
   geom_point(data = data.frame(year = 1:years, log_run = log(N_total)), color = 2)
@@ -113,7 +172,7 @@ ggplot(spawn_curves.df, aes(x = day, y = fish))+
   geom_line()+
   geom_ribbon(aes(ymin = l95, ymax = u95), color = NA, alpha = 0.2)+
   facet_wrap(~year, scales = "free_y")+
-  geom_point(data = sampled.df2, aes(x = day, y = sampled), size = 0.8)+
+  geom_point(data = df_subsampled, aes(x = day, y = sampled), size = 0.8)+
   scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners present (thousands)", expand = expansion(mult = c(0, 0.02)))+
   theme_bw()+
   theme(strip.background = element_rect(color="NA", fill="NA"))+
