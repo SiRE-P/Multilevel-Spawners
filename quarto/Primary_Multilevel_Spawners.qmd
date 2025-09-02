@@ -366,9 +366,9 @@ We challenged this model with simulated observations to be sure the resulting fi
 ```{r}
 #| label: tbl-bias
 # tbl-cap: Bias (percent) from  median of fitted annual parameters divided by true values, as a function of increasing survey gaps (days).
-if(!file.exists('../data/annual_med_mad.rds')){
+if(!file.exists('../tables/annual_med_mad.rds')){
     stop('cannot find annual_med_mad.rds')} 
-annual_mm = readRDS("annual_med_mad.rds") # 10 cols, 4 rows = gaps
+annual_mm = readRDS("../tables/annual_med_mad.rds") # 10 cols, 4 rows = gaps
 p_names = c('run', 'arrival_timing', 'arrival_spread', 'exit_spread', 'exit_lag')
 s_names = c('Sim', 'Gaps=1','Gaps=3','Gaps=5','Gaps=7') # Sim = true
 
