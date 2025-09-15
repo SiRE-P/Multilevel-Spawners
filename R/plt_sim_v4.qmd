@@ -1,0 +1,694 @@
+---
+title: "plt_sim version 4"
+author: "JLT, SAA"
+date: today
+format: pdf
+execute:
+   output: hold
+   echo: false
+---
+
+## Goal  
+
+Tables and plots showing fits for runs and the four spawning parameters as a function of:  
+(1) changing exit_lag, to prove that is reliably recovered, and  
+(2) sampling intervals to investigate results for sub-optimal surveys.  
+Uses model **spawner_m8.stan** to fit model to simulated data plus sampling error. Results are  
+(1) median of the ratio fitted/actual, to describe consistent % bias, and  
+(2) median absolute difference, MAD, of that ratio to estimate % precision
+
+## History  
+
+-   From plt_sim version 3.3 2025-07-09.
+-   From plt_sim version 3.2.JLT 2025-06-28.
+    -   Bug fix, GitHub.
+-   From plt_sim version 3.1 2025-06-23.
+    -   Uses spawners_m8_beta.stan
+-   From plt_sim_v3.qmd 2025-06-23.
+    -   This and prev use spawners_m8.stan
+-   From plt_sim_v2.qmd 2025-06-14
+-   From plt_sim.R 2025-05-29
+-   From Simulation-for-Supplementary 2025-05-20
+
+```{r}
+#| label: setup
+#| include: false
+#| echo: false
+#| warning: false
+library(tidybayes); library(tidyverse); library(scales); library(rstan); 
+library(magrittr); library(patchwork);  library(knitr); 
+options(mc.cores = parallel::detectCores())
+rstan_options(auto_write = TRUE) 
+set.seed(104) # reproduce random samples.
+```
+
+## Difference from preceding  
+Survey dates are evenly distributed sequences, not random.\
+Scenarios repeated and fitted with differing intervals between surveys: 1, 3, 6, 9 days.\
+Scenarios repeated and fitted with differing fixed values for exit_lag: 5,10, 15 days.\
+20 years instead of 12.\
+TAUC included, with analysis of bias and precision\
+updates to fig- and tbl- captions.\
+.pdf output for inclusion in primary.\
+
+# Simulation
+
+## Distributions for simulation parameters  
+Assign distributions to parameters for runs and spawner behaviour. Set years and days for surveys. Parameters as per JLT code: spawners_m8.stan
+
+```{r}
+#| label: parameters
+#| echo: true
+# revised to match JLT email 2025-07-28, 13:39.
+log_run_mu               <-  10    # log value for lognormal PDD, 
+log_run_sigma            <-   1    # log value for lognormal PDD, 
+arrival_timing_mu        <-  35    # normal  
+arrival_timing_sigma     <-   1    # 95% days 33 to 37 
+arrival_spread_mu        <-   4    # normal
+arrival_spread_sigma     <-   0.2  # 95% 3.6 to 4.4
+exit_lag_mu              <-  10    # normal 
+exit_lag_sigma           <-   0.5  # 95% 9 to 11
+exit_spread_mu           <-   3    # normal. should be < arrival_spread_mu
+exit_spread_sigma        <-   0.2  # 95%  2.6 to 3.4
+years_n                  <-  20    # number of years, 4x3 plot
+days_n                   <- 100    # initial number of days, checked below.
+samp_accuracy            <-   0.15 # rnorm(n, 1, 0.15) 
+    # 15% sampling error, +/- 95% = 0.3 is a lot. Likely under not over. 
+gaps                     <- c(1,3,5,7) # days between surveys. survey_gaps identifies scenarios.
+    # live_phi is the size parameter for the negative binomial distribution
+live_phi                 <-  10    # sampling error (version 3.1)
+    # derived
+days  = 1:days_n                   # overrides lubridate::days()
+years = 1:years_n                  # overrides lubridate::years()
+sim = c(arrival_timing_mu, arrival_timing_sigma,
+        arrival_spread_mu, arrival_spread_sigma,
+        exit_spread_mu, exit_spread_sigma, 
+        exit_lag_mu, exit_lag_sigma)
+saveRDS(sim, 'sim.rds') # save for use after rendering
+```
+
+## Draws for annual values  
+Random samples from preceding distributions to set annual values for run size and for the four spawning parameters. The likely ranges for draws (99% CL) are in @tbl-CL99. The resulting sets of `r years_n` draws are in @tbl-draws. Run sizes are lognormal: occasional unusually large runs. The 99% CLs for the parameter distributions are in @tbl-CL99, and the annual draws are in @tbl-draws. The draws are checked @tbl-checkSpreads for a possible pathology where exits are complete before arrivals are complete. Finally, the annual distributions of spawner presence are displayed @fig-sampled as well as log presence @fig-logSampled.
+
+```{r}
+#| label: tbl-CL99
+#| tbl-cap: Range (99%) of random draws for annual values of run size and spawning parameters.
+p99 = c(0.01,0.99) # +/- 2.326348 stdevs
+CL99= data.frame(
+  Parameter = c('run','arrival_timing','arrival_spread','exit_lag','exit_spread'),
+  p01 = c(qlnorm(p99[1],log_run_mu, log_run_sigma) %>% round,
+          qnorm(p99[1],arrival_timing_mu, arrival_timing_sigma) %>% round(2),
+          qnorm(p99[1],arrival_spread_mu,arrival_spread_sigma) %>% round(2),
+          qnorm(p99[1],exit_lag_mu, exit_lag_sigma) %>% round(2),
+          qnorm(p99[1],exit_spread_mu, exit_spread_sigma) %>% round(2)),
+  p99 = c(qlnorm(p99[2],log_run_mu, log_run_sigma) %>% round,
+          qnorm(p99[2],arrival_timing_mu, arrival_timing_sigma) %>% round(2),
+          qnorm(p99[2],arrival_spread_mu,arrival_spread_sigma) %>% round(2),
+          qnorm(p99[2],exit_lag_mu, exit_lag_sigma) %>% round(2),
+          qnorm(p99[2],exit_spread_mu, exit_spread_sigma) %>% round(2))
+)
+kable(CL99, align='r')
+```
+
+```{r}
+#| label: tbl-draws
+#| tbl-cap: Random draws for annual values of run size and spawning parameters.
+draws = data.frame(  year = years,
+run             = rlnorm(years_n,  log_run_mu, 
+                    log_run_sigma) %>% round,
+arrival_timing  = rnorm(years_n, arrival_timing_mu,
+                    arrival_timing_sigma) %>% round(2),
+arrival_spread  = rnorm(years_n,arrival_spread_mu,
+                    arrival_spread_sigma)  %>% round(2),
+exit_lag        = rnorm(years_n, exit_lag_mu, 
+                    exit_lag_sigma) %>% round(2),
+exit_spread     = rnorm(years_n,exit_spread_mu, 
+                     exit_spread_sigma) %>% round(2) )
+
+kable(draws, digits=1, align='c')
+saveRDS(draws, 'draws.rds') # save for use after rendering
+```
+
+```{r}
+#| label: tbl-checkSpreads
+#| tbl-cap: Typically arrival_spread is greater than exit_spread. If less than, and with small exit_lag, this can lead to late spawners exiting before arriving. This is checked as lag between the day 99% have arrived to the day 99% have exited.
+    # Days after 99% arrived until 99% exited?
+test_spread = data.frame(
+  Year = years,
+  Spread_Difference = draws$arrival_spread - draws$exit_spread,
+  In_Before_Out = 
+      (qnorm(0.99,draws$exit_lag,draws$exit_spread) -
+       qnorm(0.99,       0,draws$arrival_spread)) )
+kable(test_spread, digits=1, align = 'r')
+```
+
+```{r}
+#| label: present
+# apply annual draws for to simulate spawners present.
+present <- sapply(1:years_n, function(i){
+  entered <- pnorm(days, draws$arrival_timing[i],  draws$arrival_spread[i])
+  exited  <- pnorm(days, draws$arrival_timing[i] + draws$exit_lag[i], draws$exit_spread[i])
+  present <- (entered * (1-exited) * draws$run[i]) # zero if out before in
+  }) 
+dat_sim = data.frame(
+  year    = rep(years,each=days_n),
+  day     = rep(days,years_n),
+  present = present%>% as.vector %>% round)
+    # first and last days of presence over all year.
+a= dat_sim$day[dat_sim$present > 0]
+day_first = min(a)
+day_last  = max(a) 
+cat('range of days with spawners present:', day_first, "to", day_last, '\n')
+rm(a)
+```
+
+```{r}
+#| label: fig-present
+#| fig-cap: Time series of spawners present in each year.
+#| warning: false
+
+ggplot(dat_sim, aes(day, 1e-3*present, color=factor(year) )) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  geom_line() +
+  scale_x_continuous(limits=c(day_first, day_last)) +
+  labs(x="Day", y="Spawners Present ('000)" ) +
+  theme(legend.position = "none") 
+ggsave('spawners present.pdf',width=7, height=7)
+```
+
+## Peak live   
+As a relative index of spawner abundance, how does peak live prsence compare to the true run size? Regression through the origin @fig-peakLive provides an $R^2$ value, and the fitted slope is compared to slope=1.
+
+```{r}
+#| label: fig-peakLive
+#| fig-cap: Peak live spawners in each year compared to true run size
+pltdat= data.frame(
+    PL= by(dat_sim$present/1000, dat_sim$year, max) %>% as.vector,
+    run=draws$run / 1000) 
+a = lm(PL ~ 0 + run, data=pltdat)
+a_pred = predict(a)
+r2 = 1 -  sum((a_pred - pltdat$PL)^2) / sum((a_pred - mean(a_pred))^2)  
+slope= summary(a)$coefficients[1,1] %>% round(2) # slope of regression line
+
+ggplot(pltdat, aes(run, PL)) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  geom_point() +
+  stat_smooth(method="lm", formula=y ~ 0+x ) +
+  geom_abline(slope=1, intercept=0, color='red') +
+  labs(x="Run ('000)", y="Peak Live ('000)") +
+  annotate("label", x=0.5*max(pltdat$run), y=max(pltdat$PL), 
+    label=paste("slope = ",slope, ",  R^2 = ", round(100*r2),"%", sep=''), size=5)
+
+ggsave('peak_live_vs_run.pdf',width=7, height=7)
+```
+
+
+## Scenarios  
+A scenario has surveys at fixed _survey_gaps_, preset as _gaps_ (typically 1, 3, 5, 7 days). Same dates every year, but note spawner _arrival_timing_ varies by year. Proportional sampling error (normal) is applied to generate observations, @fig-samplError. Surveys removed if zero for simulated or sampled observations.
+
+```{r}
+#| label: surveyed
+
+# apply proportional sampling error
+dat_sim %<>% mutate(sampled = present*rnorm(nrow(dat_sim),1, samp_accuracy))
+dat_sim %<>% mutate(sampled = floor(sampled)) # truncate: 0.9 fish -> 0 fish.
+# determine survey dates with 1, 3, 5, 7 day gaps. 
+# save four survey scenarios. Same dates all years
+days_surveyed <- list(
+  seq(day_first,day_last, by=2), 
+  seq(day_first,day_last, by=4), 
+  seq(day_first,day_last, by=6), 
+  seq(day_first,day_last, by=8) )
+# create long form data frame for scenarios
+sampled.df <- data.frame()
+for(i in 1:length(days_surveyed)){
+  sampled.df <- bind_rows(sampled.df, 
+    dat_sim %>% filter(day %in% days_surveyed[[i]]) %>%
+    mutate(survey_gaps=gaps[i] ))
+}
+# delete if present =< 0 or sampled =< 0 
+sampled.df %<>% filter((sampled > 0) & (present > 0))
+# hist(sampled.df$sampled/sampled.df$present, breaks=13)
+# range(sampled.df$sampled/sampled.df$present) # 0.5, 1.46
+```
+
+```{r}
+#| label: fig-samplError
+#| fig-cap: Comparison of spawners observed to spawners present.
+#| fig-subcap: Sampling error is proportional to the number of spawners present. Note log(0)=1
+
+plt_dat = filter(sampled.df, survey_gaps == 1 )
+
+p1 <- ggplot(plt_dat, aes(1e-3*present, 1e-3*sampled)) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  geom_point(size=0.33) +
+  geom_abline(slope=1, intercept=0, color='red') +
+  labs(x="Present ('000)",y="Sampled ('000)")
+p2 <- ggplot(plt_dat, aes(log10(present), log10(sampled)) ) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  geom_point(size=0.33)+
+  geom_abline(slope=1, intercept=0, color='red') +
+  labs(x="log10 Present",y="log10 Sampled")
+p1+p2  # patchwork for plots layout
+ggsave('sampled_df.pdf',width=7, height=7)
+```
+
+## Observations  
+
+Derived observations (@fig-sampled) show scatter near day of peak abundance (mode). Viewed as logs (@fig-logSampled) to show negative skew when arrival_spread is greater than exit_spread (typical), and positive skew when smaller. 
+
+```{r}
+#| label: fig-sampled
+#| fig-cap: Annual time series of spawners from surveys with 1 day gaps (black dots) and 4 day gaps (bluecircles).
+ggplot(plt_dat, aes(x = day, y = 1e-3*sampled)) + theme_bw() +
+  theme(panel.grid.minor = element_blank()) +
+  geom_point(size=0.5) +
+  geom_point(data=filter(sampled.df, survey_gaps == 7), 
+    aes(x=day, y=1e-3*sampled), shape=1, color='blue') +
+  labs(x="Day",y="Sampled ('000)") +
+  facet_wrap(~year, scales='free_y') +
+  theme(panel.grid.minor = element_blank()) +
+  theme(strip.background = element_rect(color="NA", fill="NA") )
+ggsave('sampled.pdf',width=7, height=7)
+```
+
+```{r}
+#| label: fig-logSampled
+#| fig-cap: Annual time series of logged observations.
+#| fig-subcap: Reveals skewed distributions.
+ggplot(plt_dat, aes(x = day, y = log10(sampled))) + theme_bw() +
+  geom_point(size=0.5) +
+  geom_point(data=filter(sampled.df, survey_gaps == 7), 
+    aes(x=day, y=log10(sampled)), shape=1, color='blue') +
+  labs(x="Day",y="Sampled (log_10)") +
+  facet_wrap(~year, scales='free_y') +
+  theme(panel.grid.minor = element_blank()) +
+  theme(strip.background = element_rect(color="NA", fill="NA") )
+
+```
+
+
+
+
+# Fit
+
+## Priors for Stan  
+Bayesian priors (@tbl-priors) affect MCMC (Markov Chain Monte Carlo, or related) samples of the parameters hyperspace. The spawning parameters: *arrival_timing, arrival_spread, exit_lag, exit_spread* are treated as multilevel, groups of annual values.  
+
+In what follows, the prior *exit_lag_sigma* uses the value for *spread_sigma.* The Stan code renames *count_dispersion* as *log(live_phi)* where *live_phi* is the size parameter for the negative binomial distribution.  
+
+```{r}
+#| label: tbl-priors
+#| tbl-cap: Priors for Stan sampling of parameters space.
+priors <- data.frame(
+  prior = c("log_runs_mu", "arrival_mu", "arrival_sigma", "spread_mu","spread_sigma","exit_lag_mu", "count_dispersion"),
+  pdd=c('lnorm','norm','gamma','lnorm', 'gamma','lnorm','exp'),
+  v1 = c(10,     40,      0,    log(8-1),  0,    log(10),   1),
+  v2 = c( 1,      2,      1,      0.2,    10,     0.3,     0.2) )
+kable(priors,digits=2)
+
+```
+
+```{r}
+#| label: taucJLT
+#| eval: false 
+    # determine TAUC, Trapezoidal Area Under Curve, for each year
+    # author: JLT 
+TAUC = function (){
+    # df is a data frame with columns: year, day, sampled
+  df %<>% group_by(year) %>% 
+    summarise(TAUC = sum(0.5 * (lead(sampled,1) + sampled) * (lead(day,1) - day)) )
+  return(df)
+}
+```
+
+## Data list for Stan  
+The priors are part of the Stan data list. Convergence of the HMC sampling chains is improved by providing initial values for *arrival_mu*.\
+This data list is modified in the loop for the four scenarios of survey density.
+
+```{r}
+#| label: stanDat
+#| echo: true
+sp_dat_0 = list(
+  n_priors     = nrow(priors),
+  priors      = data.matrix(priors[,3:4]),
+  n_years     = years_n, 
+  arrival_mu  = arrival_timing_mu )
+
+#  n_obs       = nrow(sampled.df),
+#  year        = sampled.df$year, 
+#  day         = sampled.df$day,
+#  live_counts = as.integer(sampled.df2$sampled),
+  
+```
+
+## Stan compiled  
+
+```{r}
+#| label: stanCompile
+    # file.exists("../stan/spawners_m8.stan") 
+mod <- stan_model("../stan/spawners_m8.stan")
+```
+
+## Fits by scenario  
+
+```{r}
+#| label: fits
+z <- Sys.time() 
+    # create data.frames to hold results of multiple fits.
+group_medians= data.frame()  # fitted medians group parameters
+annual_medians= data.frame() # fitted medians annual parameters
+    # loop through the four scenarios of survey gaps
+for (j in gaps){   # 1,3,5,7 
+    # insert scenario data into stan data  
+  k = sampled.df$survey_gaps == j  # which rows
+  sp_dat = list_modify(sp_dat_0,
+      n_obs = sum(k),
+      year  = sampled.df$year[k],
+      day   = sampled.df$day[k],
+      live_counts= sampled.df$sampled[k] %>% as.integer )
+
+  fit <- sampling(mod, data = sp_dat,
+    chains = 4, cores = 4, iter=1500, warmup=1000,
+    init = replicate(4, list(arrival_mu=runif(1,32,37)), simplify=FALSE),
+    open_progress=TRUE, control=list(max_treedepth=20) ) 
+ 
+  traceplot(fit, nrow=5, ncol = 2 ) +  # defaults to first 10 parameters
+    theme(legend.position = "none") 
+    ggsave(paste0('traceplot_scenario_', j, '.pdf'))
+  
+      # medians of posterior distn (fits). rows: 20 years. accumulate, save: .rds
+  meds = summary(fit)$summary[c(1:9, 10:29,110:129, 130:149, 150:169, 170:189), 6] 
+  group_medians= rbind(group_medians, data.frame(
+        med = meds[1:8]) ) # drop live_phi 
+  annual_medians = rbind(annual_medians, data.frame(
+        run        = exp(meds[10:29]),  # was log_run
+        arrival_timing = meds[30:49],
+        arrival_spread = meds[50:69],
+        exit_spread    = meds[70:89],
+        exit_lag       = meds[90:109]) ) # note order of columns
+}
+
+saveRDS(group_medians,  "group_medians.rds") # save for use after rendering
+saveRDS(annual_medians, "annual_medians.rds") 
+
+cat(paste0(' *** \n Fits completed after : ', format(Sys.time() - z) ))
+```
+
+## Medians  
+Fitted medians for group values @tbl-groupMeds and annual values @tbl-annualMeds. From the fit for each scenario. Saved as group_medians.rds
+
+```{r}
+#| label: tbl-groupMeds
+#| tbl-cap: Fitted medians for group parameters,  by scenario (survey gaps).
+    # 4 groups, 2 fitted params each.
+# group_medians = readRDS("group_medians.rds") # dataframe:1 col,8 param,4 gap
+# sim = readRDS("sim.rds") # 1 col, 8 params
+g_names= c('arrival_timing_mu', 'arrival_timing_sigma',
+           'arrival_spread_mu', 'arrival_spread_sigma',
+           'exit_spread_mu', 'exit_spread_sigma', 
+           'exit_lag_mu', 'exit_lag_sigma')
+s_names = c('Sim', 'Gaps=1','Gaps=3','Gaps=5','Gaps=7') # true and 4 scenarios
+gm  = matrix(unlist(group_medians), nrow=8,ncol=4) %>% 
+    as.data.frame %>% `rownames<-`(g_names) 
+row.names(gm) = g_names # 8 rows
+gm[3:8,] = exp(gm[3:8,]) # exported as log values
+gm = cbind(sim %>% as.data.frame, gm) %>% # add simulation values
+    `colnames<-`(s_names) 
+kable(gm, digits=2)
+```
+
+```{r}
+#| label: tbl-annualMeds
+#| tbl-cap: Fitted medians for annual parameters, by scenario (survey gaps).
+    # annual_medians = readRDS("annual_medians.rds") 
+    # 4 scenarios, 20 years: 80 cols
+p_names = c('run', 'arrival_timing', 'arrival_spread', 'exit_spread', 'exit_lag')
+annual_medians = cbind(year = rep(1:years_n, 4),
+                       gap= rep(c(1,3,5,7), each = years_n),
+                       annual_medians)
+    # reorg draws to match annual_medians. years_n = 20 rows, 6 cols
+d1 = data.frame(year=1:years_n, gap=rep(0,years_n), draws[, -1]) 
+    # draws to be comparable to scenarios: is 20 rows, 7 cols
+    # add draws to top of annual_medians, but rename that
+
+annual_meds= rbind(d1, annual_medians) # stack true values above fitted values
+j = with(annual_meds, order(year, gap)) # rows: gap within year
+annual_meds = annual_meds[j,]
+
+kable(annual_meds, digits=2, row.names=FALSE) 
+```
+
+## Bias and Precision
+For annual values, compare fit to true as ratio: observed over expected. Apply over all years for each scenario of survey gaps. Accuracy is two-dimensional: bias (median) and precision(MAD, median absolute deviation). The result is @tbl-BP and @plt-BP. 
+
+
+```{r}
+#| label: medmad
+    # redone to use annual_meds that includes true values (draws).
+    # 7 cols: year gap run arrival_timing arrival_spread exit_spread exit_lag
+MedMad = function (meds, years_n=20, gaps_n=5){
+    # ratio of fitted/true, by year, by gap, by parameter
+    # then medians and MADs of annual ratios, by gap, by parameter
+    # step 1. ratios of fit to true
+    x = meds # copy to hold interim ratios
+    c_names =colnames(meds)[3:7]
+    for (k in 3:7) {  # 5 parameters
+        for(i in 1:years_n) { 
+            # for each gap, for each parameter
+            m= (i-1)*gaps_n + (1:gaps_n)
+            z = meds[m, k] # fits for one year for one parameter
+            x[m, k] = z/z[1] # ratio to first
+        }
+    } 
+    # step 2. delete ratio of true to true, where gap == 0
+    x = x[x$gap != 0, ]  
+    gaps_n = gaps_n - 1 
+    x = x[order(x$gap),3:7 ]  # order by gap. drop year and gap.
+    # step 3. median and MAD over all years, by gap, by parameter
+    x_med = x_mad = matrix(nrow=gaps_n, ncol=5) %>% as.data.frame  # hold result 
+    for (k in 1:5) {  # 5 parameters
+        for(i in 1:gaps_n) { 
+            # for each gap, for each parameter
+            m= (i-1)*years_n + (1:years_n)
+            z = x[m, k] # ratios all years for gap i, param k.
+            x_med[i, k] = median(z)
+            x_mad[i, k] = mad(z)
+        }
+    } 
+    # step 4. combine medians and MADs
+    z= cbind(x_med,x_mad) %>% `colnames<-`(c(paste0('med_', c_names), paste0('mad_', c_names)) )
+    return(z)
+} 
+
+annual_mm = MedMad(annual_meds)
+saveRDS(annual_mm, "annual_med_mad.rds") # for use after rendering
+```
+
+
+```{r}
+#| label: tbl-BP
+# tbl-cap: From annual ratios of fit/draw, bias and precision as percent, by scenarios of survey gaps.
+# annual_mm = readRDS("annual_med_mad.rds") # 10 cols, 4 rows = gaps
+# p_names = c('run', 'arrival_timing', 'arrival_spread', 'exit_spread', 'exit_lag')
+# s_names = c('Sim', 'Gaps=1','Gaps=3','Gaps=5','Gaps=7') # true and 4 scenarios
+bias = ((annual_mm[,1:5 ]-1) * 100) %>% round %>%
+    `colnames<-`(p_names) %>% t %>% `colnames<-`(s_names[-1])
+prec = (annual_mm[,6:10] * 100) %>% round %>% 
+    `colnames<-`(p_names) %>% t %>% `colnames<-`(s_names[-1])
+
+kable(bias, caption = 'Bias (percent) from median of fitted annual parameters divided by the initial simulation values, as a function of increasing survey gaps (days).')
+
+kable(prec, caption = 'Precision (percent) from MAD of fitted annual parameters divided by the initial simulation values, as a function of increasing survey gaps (days).')
+```
+
+
+## Plot relative bias and precision  
+
+```{r}
+#| label: plt-BP
+#| fig-cap: Relative bias and precision of fitted annual parameters divided by the initial simulation values, as a function of increasing survey gaps. Values are  the difference from survey gaps of 1 day.
+
+Rel_to_first = function(a){
+    for(j in 1:nrow(a)) a[j,]=a[j,]-a[j,1];return(a)}
+
+plt_dat1 = Rel_to_first(bias) %>%
+          rbind(gaps=c(1,3,5,7),.) %>% t %>% as.data.frame %>%
+          pivot_longer(cols = 2:6, names_to = "Parameter") 
+
+p1 = ggplot(plt_dat1, aes(x=gaps, y=value, color=Parameter)) +
+     theme_bw() + theme(panel.grid.minor = element_blank()) +
+     geom_point() +     geom_line() +
+     scale_x_continuous(limits = c(0,8), breaks=c(1,3,5,7) ) +
+     labs(x="Surveys Gap (days)", y="Relative Bias (%)") +
+     theme(legend.position = "none")  # just for LHS plot, not RHS plot
+
+plt_dat2 = Rel_to_first(prec) %>%
+           rbind(gaps=c(1,3,5,7),.) %>% t %>% as.data.frame %>%
+           pivot_longer(cols = 2:6, names_to = "Parameter") 
+
+p2 = ggplot(plt_dat2, aes(x=gaps, y=-value, color=Parameter)) +
+     theme_bw() + theme(panel.grid.minor = element_blank()) +
+     geom_point() +     geom_line() +
+     scale_x_continuous(limits = c(0,8), breaks=c(1,3,5,7) ) +
+     labs(x="Surveys Gap (days)", y="Relative Loss of Precision (%)") 
+
+p1+p2 
+ggsave('relative bias and precision.pdf')
+```
+
+## TAUC from survey obs  
+Algorithm from Millar and Jorday 2013.  
+Where $d$ is day and $s_j$ is the sampled value for day $d_j$, the trapezoidal area under the curve and its variance are:
+$$
+\begin{aligned}
+TAUC &= 0.5  \sum_{j=2}^{n-1}  (d_{j+1} - d_{j-1}) * s_j \\
+\text{var} (TAUC)  & = 0.25 \sum_{j=2}^{n-1}(d_{j+1} - d_{j-1})^2 * \text{var}(s_j)
+\end{aligned}
+$$
+This requires $ s_{j=1} = 0  \text{ and } s_{j=n}=0$ to be added if not present.
+The function *Trapezoid()* calculates TAUC and var(TAUC) for each year, then *TAUC()*    applies Trapezoid() by year by survey gaps (@tbl-TAUC).
+
+```{r}
+#| label: tauc
+    # determine TAUC, Trapezoidal Area Under Curve, and standard dev of that estimate,
+    # for each year. uses sampled.df 
+    # author: SAA (notice inelegance cf JLT?)
+TAUC = function (x,s){
+    # x is a data frame with columns:year, day, sampled, survey_gaps
+    # s is stdev is proportional Precision, observed = true * rnorm(n,1,samp_accuracy)
+    # so var(sampled) = s^2
+    # from Millar and Jorday 2013
+  Trapezoid = function(x,s) {
+      # trapezoidal area under curve and variance thereof from known sampling error
+      # data is extended by leading and trailing days with sampled = 0, 
+      # at dates t[0] = t[2] - 2*t[1] and t[n+1] = 2*t[n] - t[n-1] 
+    day = x$day; sampled = x$sampled
+    sampled = c(0,sampled,0)
+    n=length(day)
+    day = c( 2*day[1]-day[2], day, 2*day[n] - day[n-1] )
+       # (90,100,110,120) -> (80,90,100,110,120,130) 
+    n = n+2 # extended   
+    y = yv = 0     # trapezoid area and variance
+    for (j in 2:(n-1)) {
+        dx = 0.5* (day[j+1]-day[j-1])
+        y =  y  + dx   * sampled[j]
+        yv = yv + dx^2 * (s*sampled[j])^2 # variance from accuracy 
+    }
+    return( c(y, sqrt(yv)) ) # return area and stdev
+  }
+    # apply Trapezoid by year and survey_gaps 
+  tauc = by(
+            data = x[,c('day', 'sampled')], 
+            INDICES = list(j1=factor(x$survey_gaps), j2=factor(x$year)),
+            Trapezoid, s = s)  %>% 
+        unlist %>% matrix(ncol=2, byrow=TRUE) %>% as.data.frame 
+  return(tauc)   
+}
+
+MedMad_TAUC = function (tauc, run){
+    # tauc is a data frame with columns: year, day, sampled, survey_gaps
+    # draws is the data frame of annual draws
+  MM = function(x, run){
+      med_r= median(x/run)  # median of ratio TAUC/run
+      mad_r= mad   (x/run)  # MAD of ratio
+      return(c(med_r,mad_r) ) # return median and MAD
+  }
+  mm_t = by (data = tauc[,1],  # run$TAUC
+          INDICES = list(pattern=factor(tauc$survey_gaps)),
+          MM, run=draws$run) %>% unlist %>% as.vector
+    return(mm_t)
+} 
+
+```
+
+## TAUC Precision  
+Determine *reside*, the effective residence as the ratio of TAUC to true run, using linear regression through origin for the scenario _survey_gaps_ = 1. Then _run_tauc_ = TAUC/reside. Note _reside_ is constant across years. The function *MedMad_TAUC()* calculates the median and MAD of run_tauc/run to estimate relative bias and relative Precision (@tbl-relativeTAUC). Relative means compared to surveys with 1 day gap = two days apart. Bias is relative to 100% (no bias), median ratio 99% is -1% bias. Precision is loss of precision, a larger MAD is less precise.
+
+```{r}
+#| label: tbl-TAUC
+#| tbl-cap: Bias (median) and precision (MAD) of run size from TAUC compared to true run size before sampling error, by survey gaps.
+
+tauc = TAUC(sampled.df, samp_accuracy) 
+colnames(tauc) = c('TAUC', 'TAUC_sd') # rename columns
+    # determine residence from TAUC/draws$run
+reside = summary(lm(tauc[seq(1,80,4),1] ~ 0 + draws$run[1:20]))$coefficients[1:2]
+cat("effective residence = ", reside[1], " days (sd=", reside[2], ")\n", sep='')
+a = tauc[seq(1,80,4),1] / draws$run[1:20]
+cat("TAUC/run: median = ", round(median(a),2), " (mad = ", round(mad(a),2), ")\n", sep='')
+cat("TAUC/run: mean   = ", round(mean(a),2), " (sd=", round(sd(a),2), ")\n", sep='')
+cat("TAUC/run: range  = ", range(a)[1] %>% round(2), " to ", range(a)[2]%>% round(2), "\n", sep='')
+
+tauc = tauc / reside[1] # divide by residence to get run size and stdev of run
+# tauc is ordered by survey gaps within years. add these.
+tauc$year=rep(1:years_n, each=4); 
+tauc$survey_gaps=rep(gaps, years_n) # gaps set in Simulation above
+
+mm_t = MedMad_TAUC(tauc, draws$run) %>% `*`(100) %>% round(1) %>%
+       matrix(ncol=2, byrow=TRUE) %>% as.data.frame %>% `colnames<-`(c('Median', 'MAD'))
+mm_t$Survey_Gaps = c(1,3,5,7) # add survey gaps
+kable(mm_t[,c(3,1,2)], digits=2, align='c', col.names = c('Survey Gaps (days)', 'Bias (%)', 'Precision (%)') )
+
+```
+
+```{r}
+#| label: tbl-relativeTAUC
+#| tbl-cap: "Relative bias and relative loss of precision of TAUC run divided by actual run, compared to survey gaps = 1 day."
+
+mm_t_r  = mm_t  # to hold relative median and MAD for TAUC_run compared to gap=1
+for (j in 1:2){ mm_t_r[ ,j] = (mm_t[ ,j] -  mm_t[1,j]) } 
+mm_t_r$Survey_Gaps = gaps # add survey gap
+mm_t_r$MAD %<>% `*`(-1)  #  to be loss of precision (larger MAD less precise) 
+
+kable(mm_t_r[,c(3,1,2)], digits=2, align='c', col.names = c('Survey Gaps (days)', 'Relative Bias (%)', 'Relative Precision (%)') )
+```
+
+```{r}
+#| label: fig-relTAUC
+#| fig-cap: Relative bias and precision of TAUC run size as a ratio to actual run size. Values are relative to  surveys with 1 day gaps.
+
+pltdat= data.frame(Survey_Gaps = rep(mm_t_r$Survey_Gaps,2),
+                   Type = rep(c('Bias (median)','Precision (MAD)'), each = nrow(mm_t_r)),
+                   Value = c(mm_t_r$Median, mm_t_r$MAD) )
+
+ggplot(pltdat,  aes(x=Survey_Gaps, y= Value, colour=Type)) +
+     theme_bw()+ theme(panel.grid.minor = element_blank()) +
+     geom_point() +    geom_line() +
+     scale_x_continuous(breaks=c(1,3,5,7) ) +
+    labs(x="Surveys Gap (days)", y="Relative Bias and Precision (%)")
+
+ ggsave('TAUC relative loss of Precision.pdf')
+
+```
+
+
+## TAUC details
+@fig-badlySampled is to clarify the pattern from survey results when survey_gaps is large (7 days). @fig-TAUCvsDraw compares run from TAUC to true run, contrasting (?) results from survey_gaps = 1 day and 7 days.
+
+```{r}
+#| label: fig-badlySampled
+#| fig-cap: Annual time series of spawners from surveys with 7 day gaps
+ggplot(data= filter(sampled.df, survey_gaps == 7 ), aes(x = day, y = 1e-3*sampled)) + theme_bw() +
+  theme(panel.grid.minor = element_blank()) +
+  geom_point() + geom_line() +
+  labs(x="Day",y="Sampled ('000)") +
+  facet_wrap(~year, scales='free_y') +
+  theme(panel.grid.minor = element_blank()) +
+  theme(strip.background = element_rect(color="NA", fill="NA") )
+``` 
+
+```{r}
+#| label: fig-TAUCvsDraw
+#| fig-cap: TAUC run size compared actual run size. The red line is slope = 1, intercept = 0. Black points are survey_gaps = 1 day, blue points are survey_gaps = 7 days.
+    # match runs to tauc 
+plt_dat = data.frame(
+    survey_gaps = factor(rep(c(1,7), each=years_n)), 
+    draw_run = 1e-3 * rep(draws$run, 2), 
+    tauc_run = 1e-3 * c( tauc[tauc$survey_gaps == 1, 'TAUC'],  tauc[tauc$survey_gaps == 7, 'TAUC'])  ) 
+ggplot(plt_dat, aes(x = draw_run, y=tauc_run, colour = survey_gaps)) +
+  theme_bw() + theme(panel.grid.minor = element_blank()) +
+  geom_point(size = 2) +
+  geom_abline(slope=1, intercept=0, color='red') +
+  labs(x=" True Run ('000)",y="Run from TAUC ('000)") 
+ggsave('TAUC run vs draw run.pdf')
+```
