@@ -62,7 +62,7 @@ execute:
 ---
 
 ```{r setup, include = FALSE}
-library(knitr); 
+library(knitr)
 library(magrittr)
 library(tidyverse)
 library(tidybayes)
@@ -75,6 +75,8 @@ library(scales)
 library(geomtextpath)
 library(lubridate)
 library(ggallin)
+library(kableExtra)
+library(ggokabeito)
 
 theme_set(theme_bw())
 ```
@@ -218,7 +220,7 @@ loos <- list(
   m6 = loo_m6,
   m7 = loo_m7,
   m8 = loo_m8,
-  m10 = loo_m8_MVN)
+  m9 = loo_m8_MVN)
 
 cmp <- loo_compare(loos)
 
@@ -228,7 +230,9 @@ loo_df <- as.data.frame(cmp) %>%
     dloo = elpd_diff,
     se = se_diff
   ) |> 
-  mutate(model = factor(model, levels = c("m1","m2","m3","m4", "m5", "m6","m7", "m8", "m9")))
+  arrange(model) |> 
+  mutate(model = as.numeric(stringr::str_extract(model, "\\d+")))
+
 
 fit <- fit_m8_MVN
 post <- rstan::extract(fit)
@@ -250,7 +254,7 @@ Here we introduce an extension of existing arrival-exit approaches [e.g., @hilbo
 
 We model the timing parameters as a multivariate normal distribution (MVN) with an estimated covariance structure. This allows us to quantify any interdependence among timing parameters, and to avoid imposing a specific function relating arrival date and and residence time, as in @su2001. We use a hierarchical Bayesian framework, enabling estimation of year-to-year variation in both spawner timing and abundance. This hierarchical structure shares information across years, improving estimates when data is sparse while reducing the risk of over-fitting. We first demonstrate the performance of the model by showing how it can accurately estimate spawner timing and abundance from simulated data. Then we apply it to 25 years of spawner enumeration surveys in the Okanagan River, to demonstrate its utility for ecological inference and management-relevant estimation of spawner abundance.
 
-```{r fig-enterexit, echo=FALSE, warning=FALSE, message=FALSE, fig.height = 4, fig.width = 6, fig.align= 'center', fig.cap = "Example of how the model estimates total spawner abundance, arrival timing, arrival spread, exit lag, and exit spread based on the observed counts (points) of spawners on multiple days. The number of spawners present on a given day is the difference between accumulated arrivals and accumulated exits. We assumed spawner counts are imperfect observations of the true number (sampling error), so individual points vary from the estimated presence. The abundance of spawners is estimated as the total number that arrived. All model parameters are estimated with uncertainty – lines show the posterior median, bands show the 95% credible intervals. In the case of arrived and exited, uncertainty increases with abundance because uncertainty from the timing and spread of arrival or exit is multiplied by uncertainty in the abundance estimate."}
+```{r fig-enterexit, echo=FALSE, warning=FALSE, message=FALSE, fig.height = 4, fig.width = 6, fig.align= 'center', fig.cap = "Example of how the model estimates total spawner abundance, arrival timing, arrival spread, exit lag, and exit spread based on the observed counts (points) of spawners on multiple days. The number of spawners present on a given day is the difference between accumulated arrivals and accumulated exits. We assumed spawner counts are imperfect observations of the true number (sampling error), so individual points vary from the estimated presence. The abundance of spawners is estimated as the total number that arrived. All model parameters are estimated with uncertainty – lines show the posterior median, bands show the 95% credible intervals. For the arrival and exit curves, uncertainty grows as abundance increases. This is because uncertainty in the timing of arrivals and exits combines with the uncertainty in the overall abundance estimates."}
 j <- 25 # used 2024 as example
 arrived <- sapply(15:max(sp_dat$day), FUN = function(x) {
   pnorm(x, post$arrival[,j], post$arrival_spread[,j]) * exp(post$log_run[,j])
@@ -325,8 +329,6 @@ ggplot(example_data, aes(x = day + day_stand, y = spawners, group = type))+
 
 ```
 
-<!-- This sentence is hard to understand: In the case of arrived and exited numbers, uncertainty increases with abundance because uncertainty from the timing and spread of arrival or exit is multiplied by uncertainty from abundance.  -->
-
 # Methods
 
 ## Model
@@ -341,9 +343,8 @@ In the equations above, we specified $\mu^\text{arrival}_y$, $\sigma^\text{arriv
 
 The time-varying versions of these parameters were estimated using a hierarchical structure, where yearly values were drawn from a hyperdistribution (e.g., $\mu^\text{arrival}_y \sim \text{Normal}(\mu^\text{arrival}_\mu, \mu^\text{arrival}_\sigma)$) defined by the multiyear mean and year-to-year standard deviation. We set a prior for the arrival day group mean as $\mu^\text{arrival}_\mu \sim \text{Normal}$(`r priors[2,2]`, `r priors[2,3]`), corresponding to a mean of approximately `r round(priors[2,2]/max(sp_dat$day)*100)` % of the typical spawning survey period, with a prior interval spanning `r round((priors[2,2] - 1.96*priors[2,3])/max(sp_dat$day)*100)`--`r round((priors[2,2] + 1.96*priors[2,3])/max(sp_dat$day)*100)` days. This reflects our expectation that peak arrivals occur during the early to mid portion of the survey window. We used the prior $\mu_\sigma^{\text{arrival}} \sim \text{Exponential}$(`r priors[3,3]`) to represent a moderate level of expected year-to-year variation in $\mu_y^{\text{arrival}}$. We modelled $\sigma^\text{arrival}_y$, $\mu_y^\text{exit lag}$ and $\sigma^\text{exit}_y$ using priors of the form $\text{Exponential}(\lambda)+1$ to ensure that parameters were strictly positive and bounded away from zero following the biological constraint that spawners vary in their arrival and exit timing, and that they remain on the spawning grounds for at least one day. For these spread and lag parameters, the hierarchical structure is applied on the log-transformed scale to improve sampling and ensure positivity. We set priors for $\sigma_\mu^\text{arrival}$ and $\sigma_\mu^\text{exit}$ as $\sim \text{Normal}(\log$(`r exp(priors[4,2])`), `r priors[4,3]`), corresponding to an expectation that arrival and exit timing should have similar spread. This corresponds to an expected range of duration between `r round(exp(priors[4,2] - 1.96* priors[4,3])+1)` and `r round(exp(priors[4,2] + 1.96* priors[4,3])+1)` days. We set the prior for $\mu_\mu^\text{exit lag}$ as $\sim \text{Normal}(\log$(`r exp(priors[6,2])`), `r priors[6,3]`), aligning with the previously assumed residence time of approximately 11 days, and with likely values ranging from `r round(exp(priors[6,2] - 1.96* priors[6,3])+1)` to `r round(exp(priors[6,2] + 1.96* priors[6,3])+1)` days. We used the same $\sim \text{Exponential}$(`r priors[5,3]`) prior for $\mu_\sigma^{\text{spread}}, \mu_\sigma^{\text{exit}}$, and $\mu_\sigma^{\text{exit lag}}$ to represent a moderate level of expected year-to-year variation in these parameters on the log-transformed scale.
 
-<!--# prior intervalshould be 40 +/- 1.99*2 so 36–44.  Why divide by max(sp_dat$day)*100 ? -->
 
-In the models where we use constant versions of the timing parameters, we drop the subscript $y$ and they are denoted as: $\mu^\text{arrival}$, $\sigma^\text{arrival}$, $\mu^\text{exit lag}$, and $\sigma^\text{exit}$. In these cases, we use the prior for the group level $\mu$ and omit the group-level variance parameter, thus removing the hierarchical structure. The full model equations including priors are presented in Supplementary Material, @eq-fullmodel.
+In the models where we use constant versions of the timing parameters, we drop the subscript $y$ and they are denoted as: $\mu^\text{arrival}$, $\sigma^\text{arrival}$, $\mu^\text{exit lag}$, and $\sigma^\text{exit}$. In these cases, we use the prior for the group level $\mu$ and omit the group-level variance parameter, thus removing the hierarchical structure.
 
 In the model where all timing parameters have interannual variation, we compare a version where they are estimated independently to a model where they are jointly estimated using a multivariate normal distribution (MVN). We specify this joint estimation as: $$\boldsymbol{\theta_y} \sim \text{MVN}(\boldsymbol{\mu}, \boldsymbol{\Sigma}),$$ where $\boldsymbol{\theta_y}$ is a vector of the four timing parameters in each year,
 
@@ -360,69 +361,188 @@ An essential concept in Bayesian statistics is that the data is known but the be
 Although $\mu^\text{exit lag}_y$ defines the average delay between arrival and exit distributions, it does not equal the mean residence time (as used by TAUC). This is because residence time depends on the interactions of arrival and exit processes and is not directly estimated by any single parameter of the model. Importantly, whenever $\sigma^\text{arrival}_y \neq \sigma^\text{exit}_y$, residence time cannot be the same for all individuals, and instead varies depending on when each spawner arrives. We can, however, calculate a mean residence time in each year based on the sum of estimated number of live spawners across all days in the spawning period, $D$, divided by the estimated total spawner abundance: $$\mu^{\text{residence}}_y = \frac{\sum_{d = 1}^D \left(p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d}) \times N_y^{\text{spawners}}\right)}{N_y^{\text{spawners}}}.$$ {#eq-residence} This is the equivalent of back calculating mean residence time from the area under the curve, which is possible because we have directly estimated $N_y^{\text{spawners}}$. However, because $N_y^{\text{spawners}}$ appears in both the numerator and the denominator of @eq-residence, we can simplify this equation as: $$\mu^{\text{residence}}_y = \sum_{d = 1}^D \left(p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right).$$ {#eq-residence-simple}
 
 ## Simulations
+```{r simulations, include = FALSE}
+#values that define simulations
+log_run_mu               <-  10    # log value for lognormal PDD, 
+log_run_sigma            <-   1    # log value for lognormal PDD, 
+arrival_timing_mu        <-  35    # normal  
+arrival_timing_sigma     <-   1    # 95% days 33 to 37 
+arrival_spread_mu        <-   4    # normal
+arrival_spread_sigma     <-   0.2  # 95% 3.6 to 4.4
+exit_lag_mu              <-  10    # normal 
+exit_lag_sigma           <-   0.5  # 95% 9 to 11
+exit_spread_mu           <-   3    # normal. should be < arrival_spread_mu
+exit_spread_sigma        <-   0.2  # 95%  2.6 to 3.4
+years_n                  <-  20    # number of years, 4x3 plot
+days_n                   <- 100    # initial number of days, checked below.
+samp_accuracy            <-   0.15 # rnorm(n, 1, 0.15) 
+# 15% sampling error, +/- 95% = 0.3 is a lot. Likely under not over. 
+gaps                     <- c(1,3,5,7) # days between surveys. survey_gaps identifies scenarios.
 
-We challenged this model with simulated observations to be sure the resulting fits reliably recovered the annual values of run size and the four timing parameters. Each parameter had a prior distribution, and the annual values for simulated data were random draws from those distributions. Four survey scenarios were designed, with gaps of 1, 3, 5, and 7 days; from ample to few surveys. The resulting *true* data was modified by multiplicative normal sampling error (15% accuracy) to generate *observed* data for each survey. Observations were data for the multi-level regression using model 8 (@fig-modcompare). Despite noisy observations, parameters were recovered accurately from Stan model with 1 and 3 day gaps between surveys, but with increasing deterioration at gaps of 5 and 7 days. Accuracy has two aspects: bias and precision. We measured bias as the ratios of fitted over true, and reported the median over all surveys and all years (@tbl-bias). Precision was measured by the median absolute difference (MAD, a robust version of standard deviation) of those ratios (@tbl-prec).
+sim_params <- data.frame(parameter = c("log run", "arrival", "arrival spread", "exit lag", "exit spread"),
+           mu = c(log_run_mu, arrival_timing_mu, arrival_spread_mu, exit_lag_mu, exit_spread_mu),
+           sigma = c(log_run_sigma, arrival_timing_sigma, arrival_spread_sigma, exit_lag_sigma, exit_spread_sigma),
+           distribution = c("Normal"))
 
-```{r}
-#| label: tbl-bias
-#| echo: false
-# tbl-cap: Bias (percent) from  median of fitted annual parameters divided by true values, as a function of increasing survey gaps (days).
-if(!file.exists('../data/annual_med_mad.rds')){
-    stop('cannot find ../data/annual_med_mad.rds')} 
-annual_mm = readRDS("../data/annual_med_mad.rds") # 10 cols, 4 rows = gaps
-p_names = c('run', 'arrival_timing', 'arrival_spread', 'exit_spread', 'exit_lag')
-s_names = c('Sim', 'Gaps=1','Gaps=3','Gaps=5','Gaps=7') # Sim = true
+if(!file.exists("../data/simulations.RData")){
+m <- stan_model("../stan/spawners_m8.stan")
 
-bias = ((annual_mm[,1:5 ]-1) * 100) %>% round %>%
-    `colnames<-`(p_names) %>% t %>% `colnames<-`(s_names[-1])
-prec = (annual_mm[,6:10] * 100) %>% round %>% 
-    `colnames<-`(p_names) %>% t %>% `colnames<-`(s_names[-1])
 
-kable(bias)
+# derived
+days  = 1:days_n                   # overrides lubridate::days()
+years = 1:years_n                  # overrides lubridate::years()
+sim = c(arrival_timing_mu, arrival_timing_sigma,
+        arrival_spread_mu, arrival_spread_sigma,
+        exit_spread_mu, exit_spread_sigma, 
+        exit_lag_mu, exit_lag_sigma)
+
+
+n_sim <- 20
+sim_summary <- data.frame()
+s <- 1
+while(s <=n_sim){
+  print(paste0("sim", s))
+  #single simulation
+  draws = data.frame(  year = years,
+                       run             = rlnorm(years_n,  log_run_mu, 
+                                                log_run_sigma) %>% round,
+                       arrival_timing  = rnorm(years_n, arrival_timing_mu,
+                                               arrival_timing_sigma) %>% round(2),
+                       arrival_spread  = rnorm(years_n,arrival_spread_mu,
+                                               arrival_spread_sigma)  %>% round(2),
+                       exit_lag        = rnorm(years_n, exit_lag_mu, 
+                                               exit_lag_sigma) %>% round(2),
+                       exit_spread     = rnorm(years_n,exit_spread_mu, 
+                                               exit_spread_sigma) %>% round(2) )
+  
+  sim_values.df <- draws |> 
+    rename(arrival = arrival_timing) |> 
+    mutate(log_run = log(run)) |> 
+    gather(key = .variable, value = true_value, -year)
+  
+  present <- sapply(1:years_n, function(i){
+    entered <- pnorm(days, draws$arrival_timing[i],  draws$arrival_spread[i])
+    exited  <- pnorm(days, draws$arrival_timing[i] + draws$exit_lag[i], draws$exit_spread[i])
+    present <- (entered * (1-exited) * draws$run[i]) # zero if out before in
+  }) 
+  
+  dat_sim = data.frame(
+    year    = rep(years,each=days_n),
+    day     = rep(days,years_n),
+    present = present%>% as.vector %>% round)
+  # first and last days of presence over all year.
+  a= dat_sim$day[dat_sim$present > 0]
+  day_first = min(a)
+  day_last  = max(a) 
+  
+  dat_sim %<>% mutate(sampled = present*rnorm(nrow(dat_sim),1, samp_accuracy))
+  dat_sim %<>% mutate(sampled = floor(sampled)) # truncate: 0.9 fish -> 0 fish.
+  # determine survey dates with 1, 3, 5, 7 day gaps. 
+  # save four survey scenarios. Same dates all years
+  days_surveyed <- list(
+    seq(day_first,day_last, by=2), 
+    seq(day_first,day_last, by=4), 
+    seq(day_first,day_last, by=6), 
+    seq(day_first,day_last, by=8) )
+  # create long form data frame for scenarios
+  sampled.df <- data.frame()
+  for(i in 1:length(days_surveyed)){
+    sampled.df <- bind_rows(sampled.df, 
+                            dat_sim %>% filter(day %in% days_surveyed[[i]]) %>%
+                              mutate(survey_gaps=gaps[i] ))
+  }
+  # delete if present =< 0 or sampled =< 0 
+  sampled.df %<>% filter((sampled > 0) & (present > 0))
+  
+  sp_dat_0 = list(
+    n_priors     = nrow(priors),
+    priors      = data.matrix(priors[,-1]),
+    n_years     = years_n, 
+    arrival_mu  = arrival_timing_mu )
+  
+  annual_medians= data.frame() # fitted medians annual parameters
+  # loop through the four scenarios of survey gaps
+  sim_fail <- FALSE         
+  for (j in gaps){   # 1,3,5,7 
+    # insert scenario data into stan data  
+    k = sampled.df$survey_gaps == j  # which rows
+    sp_dat = list_modify(sp_dat_0,
+                         n_obs = sum(k),
+                         year  = sampled.df$year[k],
+                         day   = sampled.df$day[k],
+                         live_counts= sampled.df$sampled[k] %>% as.integer )
+    
+    fit <- sampling(m, data = sp_dat,
+                    chains = 4, cores = 4,control = list(adapt_delta = 0.95), init = replicate(4, init_fun(), simplify = FALSE))
+    Rhat_max <- max(summary(fit)$summary[,"Rhat"], na.rm = TRUE)
+    n_eff_min <- min(summary(fit)$summary[,"n_eff"], na.rm = TRUE)
+    div_trans <- sum(sapply(get_sampler_params(fit, inc_warmup = FALSE), function(x) sum(x[, "divergent__"])))
+    
+    if (Rhat_max > 1.01 | div_trans > 0) {
+      sim_fail <- TRUE
+      break     # stop checking other gaps for this sim
+    }  
+    annual_medians <- bind_rows(annual_medians, 
+                                spread_draws(
+    fit,
+    log_run[year],
+    arrival[year],
+    arrival_spread[year],
+    exit_spread[year],
+    exit_lag[year]
+  ) %>%
+  gather(key = .variable, value = .value,
+         log_run, arrival, arrival_spread, exit_spread, exit_lag) %>%
+  group_by(year, .variable) %>%
+  summarise(
+    est_value = median(.value, na.rm = TRUE),
+    l95       = quantile(.value, 0.025, na.rm = TRUE),
+    u95       = quantile(.value, 0.975, na.rm = TRUE),
+    precision = median(abs(.value - median(.value, na.rm = TRUE)), na.rm = TRUE),
+    .groups   = "drop"
+  ) %>%
+  mutate(
+    gap       = j,
+    Rhat_max  = Rhat_max,
+    n_eff_min = n_eff_min,
+    div_trans = div_trans
+  )
+  )
+  }
+  
+  if (!sim_fail) {
+    sim_summary1 <- left_join(annual_medians, sim_values.df) |> mutate(diff = true_value - est_value, 
+                                                                       in_95 = u95 > true_value & true_value >l95, 
+                                                                       ratio = est_value/true_value) |> 
+      arrange(.variable) |> 
+      mutate(sim = s)
+    sim_summary <- bind_rows(sim_summary, sim_summary1)
+  }
+  s <- s+1
+}
+
+save(sim_summary, file = "../data/simulations.RData")
+} else{
+  load("../data/simulations.RData")
+}
 ```
 
-```{r}
-#| label: tbl-prec
-#| echo: false
-# tbl-cap: Precision (percent) from  MAD of fitted annual parameters divided by true values, as a function of increasing survey gaps (days).
-kable(prec)
+To quantify how reliably the statistical model could estimate the annual values of run size and the four timing parameters, we challenged our model with simulated data. The simulations were generated using the same parameters as the statistical model. Each simulation consisted of 20 years of observations, where the annual parameters governing the spawning timing and run size were drawn randomly from the distributions in @tbl-sim. These yearly parameters are considered to be the *true* values to which we compare our estimated values from the statistical model. The resulting *true* data was modified by multiplicative normal sampling error (15% accuracy) to generate *observed* data. To test the sensitivity of our model to different sampling frequency, we contrasted results when we subsampled these timeseries with 1, 3, 5 and 7 day gaps. We then ran 20 replicate simulations to ensure that our results were representative. We fit these observed data with statistical model 8 (@fig-modcompare), which is the same as our selected model 9 but without the multivariate correlation structure between parameters. Because our goal was to test recovery of known values rather than parameter correlations, we did not include this additional complexity in our simulations. 
+
+For each year, we quantified the median absolute deviation (MAD, a robust version of standard deviation) of the posterior draws around the median and bias as the ratios of fitted over true values. We also quantified coverage, which is the proportion of years in which the true value fell within the 95% posterior credible interval.
+
+```{r tbl-sim, echo=FALSE, warning=FALSE, message=FALSE}
+#| tbl-cap: "Simulation parameters used in the study."
+knitr::kable(
+  sim_params,
+  booktabs = TRUE,
+  linesep = "",
+  longtable = TRUE
+) |>
+  kableExtra::kable_styling(latex_options = "repeat_header")
 ```
 
-To clarify how accuracy deteriorates with fewer surveys, @plt-BP compares scenarios with 3, 5, and 7 day gaps between surveys to the scenario with 1 day gaps. This avoids inaccuracy due to imposed sampling error. This plot shows that bias becomes a problem, exceeding 20% for run size and exit spread, with 5 day gaps, but fits for exit_lag are robust even with 7 day gaps. Loss of relative precision is most apparent for run size, but that case is still less than 10% worse with 7 day gaps compared to 1 day gaps, The precision of parameters is robust to decreasing survey density.
 
-An important aspect of this paper is determination of exit_lag from survey data, replacing an independent estimate of residence time. Simulations indicate that parameter is estimated with perhaps tolerable accuracy for the scenario of 5 day gaps: bias of \~10% increase and precision of \~6% decrease. These results differ between simulations with different random draws, but the preceding conclusions are consistently supported. These simulations used model 8, which estimates for five parameters for each year, but with group effects from multi-level regression. Situations with low survey density might resort to model 3, a less demanding regression with three parameters per year (exit lag and exit spread are constants, not annual estimates). Note the model used to fit the simulated data was the same model used to create that data, reality will differ (process error).
-
-```{r}
-#| label: plt-BP
-#| echo: false
-#| fig-cap: Relative bias and precision of fitted annual parameters divided by true values, as a function of increasing survey gaps. Values are the difference from survey gaps of 1 day.
-
-Rel_to_first = function(a){
-    for(j in 1:nrow(a)) a[j,]=a[j,]-a[j,1];return(a)}
-
-plt_dat1 = Rel_to_first(bias) %>%
-          rbind(gaps=c(1,3,5,7),.) %>% t %>% as.data.frame %>%
-          pivot_longer(cols = 2:6, names_to = "Parameter") 
-
-p1 = ggplot(plt_dat1, aes(x=gaps, y=value, color=Parameter)) +
-     theme_bw() + theme(panel.grid.minor = element_blank()) +
-     geom_point() +     geom_line() +
-     scale_x_continuous(limits = c(0,8), breaks=c(1,3,5,7) ) +
-     labs(x="Surveys Gap (days)", y="Relative Bias (%)") +
-     theme(legend.position = "none")  # just for LHS plot, not RHS plot
-
-plt_dat2 = Rel_to_first(prec) %>%
-           rbind(gaps=c(1,3,5,7),.) %>% t %>% as.data.frame %>%
-           pivot_longer(cols = 2:6, names_to = "Parameter") 
-
-p2 = ggplot(plt_dat2, aes(x=gaps, y=-value, color=Parameter)) +
-     theme_bw() + theme(panel.grid.minor = element_blank()) +
-     geom_point() +     geom_line() +
-     scale_x_continuous(limits = c(0,8), breaks=c(1,3,5,7) ) +
-     labs(x="Surveys Gap (days)", y="Relative Loss of Precision (%)") 
-
-p1+p2 
-```
 
 ## Okanagan sockeye
 
@@ -460,32 +580,32 @@ signed_log10_trans <- trans_new(
   inverse = function(x) sign(x) * 10^abs(x)
 )
 
-data.frame(model = factor(c("m1","m2","m3","m4", "m5", "m6","m7", "m8", "m9"), levels = c("m1","m2","m3","m4", "m5", "m6","m7", "m8", "m9")),
+data.frame(model = 1:9,
            arrival = c("constant/not included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included"), 
            arrival_spread = c("constant/not included", "constant/not included","varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included", "varies/included"), 
            exit_spread = c("constant/not included", "constant/not included", "constant/not included", "varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included"),
            residence = c("constant/not included", "constant/not included", "constant/not included", "constant/not included", "varies/included", "varies/included", "constant/not included", "varies/included", "varies/included"),
-            MVN = c(rep("constant/not included", 8), "varies/included")) %>%
+           MVN = c(rep("constant/not included", 8), "varies/included")) %>%
   gather(key = parameter, value = value, -model) %>% 
   mutate(parameter = factor(parameter, levels = c("arrival", "arrival_spread", "exit_spread", "residence", "MVN"))) |> 
   ggplot(aes(x = parameter, y = model, fill = value))+
-    geom_tile(color = "grey")+
+  geom_tile(color = "grey")+
   scale_fill_manual(values = c("NA", "black"), "")+
-  scale_y_discrete(limits = rev)+
+  scale_y_reverse(breaks = 1:9)+
   theme(legend.position = "bottom")+
   coord_cartesian(expand = FALSE)+
   theme(panel.grid = element_blank(),
         axis.ticks = element_blank())+
   labs(x = "Parameter or model structure", y = "Model")+
   scale_x_discrete(
-  labels = c(
-    "arrival" = expression(mu[y]^arrival),
-    "arrival_spread" = expression(sigma[y]^arrival),
-    "exit_spread" = expression(sigma[y]^exit),
-    "residence" = expression(mu[y]^"exit lag"),
-    "AR" = "AR"
-  )
-)+
+    labels = c(
+      "arrival" = expression(mu[y]^arrival),
+      "arrival_spread" = expression(sigma[y]^arrival),
+      "exit_spread" = expression(sigma[y]^exit),
+      "residence" = expression(mu[y]^"exit lag"),
+      "AR" = "AR"
+    )
+  )+
   theme_bw()+
   theme(panel.grid = element_blank(), legend.position = "bottom")+
 
@@ -496,7 +616,7 @@ ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
   geom_errorbar(aes(ymin = dloo - se, ymax = dloo + se), width = 0) +
   coord_flip() +
   scale_y_continuous(trans = pseudolog10_trans, breaks = c(-100, -10, -1))+
-  scale_x_discrete(limits = rev)+
+  scale_x_reverse(breaks = 1:9)+
   labs(
     x = "",
     y = expression(Delta*ELPD~"(rel. to best)")
@@ -509,7 +629,7 @@ ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
   geom_point(size = 2) +
   geom_errorbar(aes(ymin = p_loo - se_p_loo, ymax = p_loo  + se_p_loo), width = 0) +
   coord_flip() +
-  scale_x_discrete(limits = rev)+
+  scale_x_reverse(breaks = 1:9)+
   labs(
     x = "",
     y = expression("effective parameters (" * p[loo] * ")")
@@ -522,10 +642,49 @@ ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
   plot_annotation(tag_levels = "A")+
   plot_layout(widths = c(1, 0.5, 0.5))
 ```
+## Model fit to simulated data
+We find that the model is able to estimate the parameters used to generate our simulated data with reasonably low bias, median absolute deviation, and good 95% posterior credible interval coverage when using data with a one day gap between surveys (@fig-sims). As the gap between surveys increases, estimates become more biased, and less precise, but the degree to which they do so varies by parameter. Our estimate of total abundance, log run size, is the least sensitive to survey gap; higher survey gaps lead to a slight negative bias, but this is only `r round(median(100*(1- sim_summary$ratio[sim_summary$.variable == "log_run" & sim_summary$gap == 7])), 1)`% with a gap of 7 days between surveys, and the proportion of years for which the true log run size falls within the 95% posterior credible estimate only decreases from nearly 100% with 1 and 3 day gaps to ~ 80% with 5 and 7 day gaps. Arrival, arrival spread, and exit spread, are more sensitive to increasing survey gaps, with their deviations from the true value increasing and these deviations becoming more negative. Exit lag is the most sensitive to increased survey gaps; our simulations show that the model struggles to accurately estimate its true value even with 1 day gaps, and increasing gaps tend to result in greater and greater overestimation. 
 
-## Model fit to observed counts
+```{r fig-sims, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 9, fig.align= 'center', fig.cap= "Median absolute deviation (A), bias (B), and 95% credible interval coverage (C) for each parameter for simulated data as a function of increasing survey gap (days). All measures compare modelled estimates with true values used to generate the simulations. Points and intervals in panels A and B show the median, 66% and 95% distribution of yearly values, pooled across 20 replicate simulations, each consisting of 20 individual years. Panel C shows the corresponding distributions of coverage across simulations."}
 
-Our expected counts correspond well with the observed counts @fig-spawnercurves and @fig-obsfit. Variation between the observed and expected is quantified in our estimate of spawner count overdispersion ($\phi^\mathrm{live}$), which had a posterior median of `r round(median(post$live_phi), 1)` (95% CI: `r round(quantile(post$live_phi, 0.025), 1)`--`r round(quantile(post$live_phi, 0.975), 1)`).
+  ggplot(sim_summary, aes(x = gap, y = precision * 100, color = .variable))+
+  geom_hline(yintercept = 0, lty = 2)+
+  stat_pointinterval(position = position_dodge(width = 0.5))+
+  #scale_color_okabe_ito()+
+  labs(x = "Survey gap (days)",
+       y =  "Median absolute deviation (%)")+
+  scale_x_continuous(breaks = seq(1, 7, by = 2))+
+  theme_bw()+
+  theme(legend.position = "bottom")+
+    
+      ggplot(sim_summary , aes(x = gap, y = (1-ratio)*100, color = .variable))+
+  geom_hline(yintercept = 0, lty = 2)+
+  stat_pointinterval(position = position_dodge(width = 0.5))+
+  #scale_color_okabe_ito()+
+  labs(x = "Survey gap (days)",
+       y = "Bias (%)")+
+  scale_x_continuous(breaks = seq(1, 7, by = 2))+
+  theme_bw()+
+    
+  ggplot(sim_summary |> group_by(gap, .variable, sim) |> summarise(in_95_perc = mean(in_95)*100) , aes(x = gap, y = in_95_perc, color = .variable))+
+  geom_hline(yintercept = 100, lty = 2)+
+  stat_pointinterval(position = position_dodge(width = 0.7))+
+  #scale_color_okabe_ito(name = "")+
+  labs(x = "Survey gap (days)",
+       y =  "95% CI coverage (%)")+
+  scale_x_continuous(breaks = seq(1, 7, by = 2))+
+  theme_bw()+
+  
+  plot_annotation(tag_levels = "A")+
+  plot_layout(guides = "collect") &
+  scale_color_okabe_ito(name = "") &
+  theme(legend.position = "bottom")
+
+```
+
+## Model fit to Okanagan sockeye counts
+
+Our expected counts correspond well with the observed Okanagan sockeye counts (@fig-spawnercurves; @fig-obsfit). Variation between the observed and expected is quantified in our estimate of spawner count overdispersion ($\phi^\mathrm{live}$), which had a posterior median of `r round(median(post$live_phi), 1)` (95% CI: `r round(quantile(post$live_phi, 0.025), 1)`--`r round(quantile(post$live_phi, 0.975), 1)`).
 
 ```{r fig-spawnercurves, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Observed versus estimated spawners present over the spawning period in each year (panels). Points show the observed counts, the lines and shaded bands show the posterior median the 95% credible intervals. Y-axis limits vary across panels to emphasize model fit rather than variation across years.", fig.align='center', fig.height=7, fig.width=8}
 spawn_curves.df <- data.frame()
@@ -575,8 +734,6 @@ for(j in 1:ncol(post$log_run)){
 colnames(effective_residence) <- unique(index_sk$year)
 
 ```
-
-<!-- from @Scott: the confidence/uncertainty intervals for spawning behaviour/timing parameters are the default: .width = c(0.66, 0.95). So bars are 66% and 90%. note +/- 1 stdev is 68.27%.  I would have gone with 50% and 95% CLs: .width = c(0.5, 0.975). -->
 
 ## Spawning timing
 
@@ -639,24 +796,33 @@ spread_draws(fit, arrival[year]) %>%
 ```
 
 ```{r fig-cor, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Estimated pariwise correlations between the four timing parameters. The colour shows the posterior median value, numbers indicate the proportion of the posterior with the same sign.", fig.align='center', fig.height=4, fig.width=5}
+
+param_labels <- c(
+  "1" = expression(mu[y]^arrival),
+  "2" = expression(sigma[y]^arrival),
+  "3" = expression(sigma[y]^exit),
+  "4" = expression(mu[y]^exit_lag)
+)
+
 spread_draws(fit, Omega[parameter1, parameter2]) %>%
-    mutate(
-    parameter1 = factor(recode(parameter1, `1` = "Arrival", `2` = "ArrSpread",
-                        `3` = "ExitSpread", `4` = "ExitLag")),
-    parameter2 = factor(recode(parameter2, `1` = "Arrival", `2` = "ArrSpread",
-                        `3` = "ExitSpread", `4` = "ExitLag"))
-  ) |>
-  filter(as.integer(parameter1) < as.integer(parameter2)) |> 
-  group_by(parameter1, parameter2) |> 
-  summarise(correlation = median(Omega), prop_positive = mean(Omega>0), prop_negative = mean(Omega<0)) |> 
-  mutate(prop_direction = ifelse(prop_positive>prop_negative, prop_positive, prop_negative)) |> 
-  ggplot(aes(x = parameter1, y = parameter2, fill = correlation)) +
-  geom_tile()+
-  geom_text(aes(label = sprintf("%.2f", prop_direction)), color = "black") +
-  scale_fill_gradient2(low = "dodgerblue", high = "red", "Correlation")+
-  ylab("")+
-  xlab("")+
-  theme_bw()
+  filter(parameter1 < parameter2) %>% 
+  group_by(parameter1, parameter2) %>% 
+  summarise(
+    correlation = median(Omega),
+    prop_positive = mean(Omega > 0),
+    prop_negative = mean(Omega < 0)
+  ) %>% 
+  mutate(
+    prop_direction = ifelse(prop_positive > prop_negative, prop_positive, prop_negative)
+  ) %>%
+  ggplot(aes(x = factor(parameter1), y = factor(parameter2), fill = correlation)) +
+    geom_tile() +
+    geom_text(aes(label = sprintf("%.2f", prop_direction)), color = "black") +
+    scale_fill_gradient2(low = "dodgerblue", high = "red", name = "Correlation") +
+    scale_x_discrete(labels = param_labels) +
+    scale_y_discrete(labels = param_labels) +
+    xlab("") + ylab("") +
+    theme_bw()
 ```
 
 ## Total spawner abundance
@@ -708,6 +874,9 @@ spread_draws(fit, log_run[year]) %>%
 
 Conventional approaches to estimating salmon spawner abundance, such as the TAUC method [@ames1977; @perrin1990], rely on fixed assumptions about residence time and ignore observation error and interannual variability in spawning dynamics. While subsequent methods have addressed some of these limitations individually [e.g., @millar2012; @szerlong2008; @hilborn1999; @su2001], they have not been widely adopted. Our model builds on these advances, and provides a more general modelling framework that jointly estimates annual run size, arrival timing, arrival spread, exit lag, and exit spread, while accounting for observation error and associated uncertainty. Simulation results demonstrate that the model can recover accurate estimates of the parameters across a range of spawning dynamics. The application to the `r length(unique(index_sk$year))`-year time series of Okanagan sockeye data further illustrates its utility for providing robust abundance estimates that can support sustainable management of the population as well as insight into its ecology.
 
+## Model accuracy and precision
+Our simulations demonstrate that the model is able to estimate parameter values with reasonable accuracy and precision, but that this is reduced as the gap between surveys in the dataset increases. Estimates of specific spawner timing parameters, particularly exit-lag, should be considered less reliable when survey frequency is not high. However, log run size, which is the primary variable of interest in spawner enumeration surveys, is relatively robust to low survey frequency.
+
 ## Residence time
 
 Estimating residence time directly from the spawner surveys represents an important advance over methods that rely on an assumed value. Because residence time directly scales the estimated spawner abundance, incorrect assumptions can lead to substantial bias---underestimating abundances if assumed residence is too high, or overestimating if too low. Instead of assuming a fixed residence time, our method estimates the arrival and exit processes in each year. This idea is not new; @hilborn1999 demonstrated how residence time could be estimated from visual spawner data. As in @su2001 and @adkison2001, our method uses a hierarchical structure to estimate interannual variability in residence time, while reducing the risk of overfitting to noisy or sparse data. In our application to Okanagan sockeye, we estimate the median *effective residence* time to be `r round(median(effective_residence), 1)` days, which is close to the previously assumed 11 days [@hyatt2010], but lower than the 11.9 to 14.3 day estimates based on tilt tags in 2006 and 2007 [@shardlow2011]. However, residence time varies across years from `r round(min(apply(effective_residence, 2, median)), 1)` to `r round(max(apply(effective_residence, 2, median)), 1)` days, suggesting that assuming a fixed value likely introduces bias in specific years. Comparing our specific estimates in 2006 and 2007 to those from @shardlow2011, we find that our estimates are still lower. In 2006, our median residence time is `r round(apply(effective_residence, 2, median), 1)[7]` days (95% CI = `r round(quantile(effective_residence[,7], probs = 0.025), 1)`-`r round(quantile(effective_residence[,7], probs = 0.975), 1)`) and @shardlow2011 estimated 14.1 days for females and 13.7 days for males. In 2007, our median residence time is `r round(apply(effective_residence, 2, median), 1)[8]` days (95% CI = `r round(quantile(effective_residence[,8], probs = 0.025), 1)`-`r round(quantile(effective_residence[,8], probs = 0.975), 1)`) and @shardlow2011 estimated 14.3 days for females and 11.9 days for males.
@@ -716,37 +885,33 @@ Estimating residence time directly from the spawner surveys represents an import
 
 Our method provides uncertainty estimates for spawner abundance and all spawning timing parameters, an important advantage over conventional methods such as TAUC that provide point estimates without uncertainty. The GAUC method [@millar2012] already provides uncertainty estimates that account for observation error, and mechanistic arrival-exit process models [@hilborn1999] can propagate uncertainty in residence time. However, the hierarchical Bayesian structure used here enables joint estimation of all parameters and ensures that uncertainty is consistently propagated throughout the model.
 
-Uncertainty is a key piece of information for fisheries management, enabling decision-makers to assess risk and apply the precautionary approach when managing stocks [@harwood2003]. Uncertainty estimates from spawner abundance models should be propagated to subsequent life-stage models, such as those estimating parr and smolt production or adult returns from spawners. Ignoring measures of uncertainty is essentially ignoring useful information, and can result in overconfident abundance estimates which can obscure true relationships or inflate false signals [@mcelreath2020].\
-\
-<!--# I removed "uncertainty perceived as weakness" and added an introductory phrase, but this last sentence is (a) important and (b) still not quite right. No such thing as "overconfident estimates"; rather, failure to downweight imprecise estimates (that are more likely to be outliers) that might bias (mislead) or obscure true reationships. And if you know the page in McElreath's book, maybe add that? -->
+Uncertainty is a key piece of information for fisheries management, enabling decision-makers to assess risk and apply the precautionary approach when managing stocks [@harwood2003]. Uncertainty estimates from spawner abundance models should be propagated to subsequent life-stage models, such as those estimating parr and smolt production or adult returns from spawners. Ignoring measures of uncertainty is essentially ignoring useful information, and can result in treating imprecise estimates as overly precise, which may obscure true relationships or amplify false signals [@mcelreath2020].
 
 ## Ecology
 
-Through modelling the underlying process of spawning arrival and exit, our model produces ecologically informative parameters that provide new insight into the timing of spawning dynamics. These parameters are not available through TAUC or GAUC although some are estimated in previous arrival-exit process models [@szerlong2008; @hilborn1999; @su2001]. In contrast with models that assume a fixed arrival-exit relationship [e.g., @su2001], our model jointly estimates timing parameters using a multivariate normal distribution, enabling flexible, data-informed correlations between arrival and exit <!--# WHY are these correlations valuable and/or important?  -->
+Through modelling the underlying process of spawning arrival and exit, our model produces ecologically informative parameters that provide new insight into the timing of spawning dynamics. These parameters are not available through TAUC or GAUC although some are estimated in previous arrival-exit process models [@szerlong2008; @hilborn1999; @su2001]. In contrast with models that assume a fixed arrival-exit relationship [e.g., @su2001], our model jointly estimates timing parameters using a multivariate normal distribution, enabling flexible, data-informed correlations between arrival and exit. 
 
 Applying this model in the Okanagan sockeye population, we observe considerable interannual variation in some aspects of spawning timing. Arrival timing was surprisingly consistent, ranging by only `r round(max(apply(post$arrival, 2, median))+day_stand - 1) - round(min(apply(post$arrival, 2, median))+day_stand - 1)` days. In contrast, arrival spread varied considerably from year-to-year, ranging from `r round(min(apply(post$arrival_spread, 2, median)), 1)` days in
  `r unique(index_sk$year)[which(apply(post$arrival_spread, 2, median) == min(apply(post$arrival_spread, 2, median)))]` to
  `r round(max(apply(post$arrival_spread, 2, median)),1)` days in
  `r unique(index_sk$year)[which(apply(post$arrival_spread, 2, median) == max(apply(post$arrival_spread, 2, median)))]`.
-Exit spread was less variable than arrival spread but showed an overall increasing trend, averaging `r round(mean(apply(post$exit_spread[,1:5], 2, median)),1)` days in the first five years and `r round(mean(apply(post$exit_spread[,(length(unique(index_sk$year))-5):length(unique(index_sk$year))], 2, median)),1)` days in the last five years. We find that in years when spawners arrive later, arrival is spread over a longer period of time, suggesting that the date when the first fish arrive may be relatively constant across years, even if the overall distribution is variable. In Okanagan sockeye, we estimate that exit spread tends to be smaller than arrival spread, which implies that spawner residence time is a function of order of entry (early arrivals stay longer). This is consistent with the assumption in @su2001 and @adkison2001, but here we estimate it directly from the data. This pattern has been identified in other studies, where it has been attributed to the fact that salmon of different age and sex may arrive at different times (\[@perrin1990; sockeye: @killick1955; pink: @fukushima1997b; @dangel1988\].
+Exit spread was less variable than arrival spread but showed an overall increasing trend, averaging `r round(mean(apply(post$exit_spread[,1:5], 2, median)),1)` days in the first five years and `r round(mean(apply(post$exit_spread[,(length(unique(index_sk$year))-5):length(unique(index_sk$year))], 2, median)),1)` days in the last five years. We find that in years when spawners arrive later, arrival is spread over a longer period of time, suggesting that the date when the first fish arrive may be relatively constant across years, even if the overall distribution is variable. In Okanagan sockeye, we estimate that exit spread tends to be smaller than arrival spread, which implies that spawner residence time is a function of order of entry (early arrivals stay longer). This is consistent with the assumption in @su2001 and @adkison2001, but here we estimate it directly from the data. This pattern has been identified in other studies, where it has been attributed to the fact that salmon of different age and sex may arrive at different times [@perrin1990; sockeye: @killick1955; pink: @fukushima1997b; @dangel1988].
 
-<!--# Su et al 2001 text: "it is well known that longevity of salmon on the spawning ground declines as the season progresses (Dangel and Jones 1988; Perrin and Irvine 1990; Fukushima and Smoker 1997)"apart killick 1955, Perrin and Irvine are speculating, and both Dangel and Jones, and Fukushima and Smoker are about pink salmon. There is a dearth of literature re early sockeye spawners staying longer. -->
+In addition to improving estimation of the parameters themselves, the multivariate normal correlation structure reveals how arrival and exit processes co-vary. For Okanagan sockeye, we estimate that arrival and arrival spread are positively correlated, indicating that when arrival is more spread out, this pushes the average arrival date later. The other parameters are more weakly associated, although there is some evidence that greater arrival spread (and thus later arrival) is associated with a narrow exit timing, which is consistent with spawners being constrained by biological limits late in the season. 
 
-Extending the analysis of Okanagan sockeye to estimate how the spawning timing depends on environmental conditions is an obvious next step. @perrin1990 identified a suite of potential covariates for residence: spawner density, sex, size, sex ratio, mean arrival timing (years that are late may have shorter residence), order of arrival, stream flow, and water temperature. In Atlantic salmon, older and larger spawners arrive earlier than younger and smaller spawners, and female salmon arrive earlier in the season than males [@miettinen2024]. In sockeye, however, males tend to arrive earlier, and remain alive longer than females [@mathisen1962]. Because of this, we might expect that years with high proportion fish that return after one marine winter (age x.1) would have a skewed sex ratio due to the high prevalence of males (jacks) in that age class – but note that this population has an unusually high incidence of age x.1 females (jills) [@major1962]. But the four years with the highest proportion of age x.1 fish [2003, 2007, 2019, 2021; @bailey2025], that are also extremely low spawner abundances, do not show anomalous spawning timing @fig-timings. This is a qualitative comparison; future work could use our model to quantify how biometric and environmental factors influence each of the timing parameters of our model, using a casual inference framework [@cinelli2022].
+Extending the analysis of Okanagan sockeye to estimate how the spawning timing depends on environmental conditions is an obvious next step. @perrin1990 identified a suite of potential covariates for residence: spawner density, sex, size, sex ratio, mean arrival timing (years that are late may have shorter residence), order of arrival, stream flow, and water temperature. In Atlantic salmon, older and larger spawners arrive earlier than younger and smaller spawners, and female salmon arrive earlier in the season than males [@miettinen2024]. In sockeye, however, males tend to arrive earlier, and remain alive longer than females [@mathisen1962]. Because of this, we might expect that years with high proportion fish that return after one marine winter (age x.1) would have a skewed sex ratio due to the high prevalence of males (jacks) in that age class – but note that this population has an unusually high incidence of age x.1 females (jills) [@major1962]. But the four years with the highest proportion of age x.1 fish [2003, 2007, 2019, 2021\; @bailey2025], that are also extremely low spawner abundances, do not show anomalous spawning timing (@fig-timings). This is a qualitative comparison; future work could use our model to quantify how biometric and environmental factors influence each of the timing parameters of our model, using a casual inference framework [@cinelli2022].
 
 Notably, the widest spread in arrival times occurred in 2010, which may be related to the Testalinden Creek dam failure that occurred the previous spring (June 13, 2010). When this occurred, silt and toxins were discharged into the Okanagan River [@morhart2010; @tannant2013]. The discharge was downstream of the spawning region but affected Osoyoos Lake and the Okanagan River below it. Suboptimal conditions there may have contributed to the increased variation in the timing of spawner arrival that year. Of all the model parameters, only arrival spread appears to be associated with the Testalinden dam failure; how or if the event directly affected spawners remains unclear.
 
 ## Observer accuracy
 
-One persistent challenge with spawner enumeration data is the fact that observations are made with error. In many cases, TAUC methods do not account for observation error at all, although methods exist to do this [@parken2003]. Observer efficiency is typically expected to cause a negative bias; that is, observers only see a fraction of the fish. However, overestimation is also possible. A range of factors, including observer identity, survey method, turbidity, cloud cover, and even spawner abundance potentially affect accuracy of counts. A logical extension of our model would be to allow the overdispersion parameter of the negative binomial distribution in our model, $\phi$, which captures the variability of the counts around around their expected value, to vary as a function of one or more of these factors.\
-\
-<!--# Independent calibration of observer efficiency (fraction counted) might be mentioned. That is an assumed parameter value in Hilborn et al. 1999 and is as important as assuming residence time (survey life) -->
+One persistent challenge with spawner enumeration data is the fact that observations are made with error. In many cases, TAUC methods do not account for observation error at all, although methods exist to do this [@parken2003]. Observer efficiency is typically expected to cause a negative bias; that is, observers only see a fraction of the fish. However, overestimation is also possible. A range of factors, including observer identity, survey method, turbidity, cloud cover, and even spawner abundance potentially affect accuracy of counts. A logical extension of our model would be to allow the overdispersion parameter of the negative binomial distribution in our model, $\phi$, which captures the variability of the counts around around their expected value, to vary as a function of one or more of these factors.
 
-## Comparison to TAUC 
+<!-- ## Comparison to TAUC  -->
 
-We compared our model to TAUC calculated from the surveys. Using the fixed assumption of 11 days for residence time produced a small bias as described above. We also compared the variability of TAUC to the model estimates of run size.
+<!-- We compared our model to TAUC calculated from the surveys. Using the fixed assumption of 11 days for residence time produced a small bias as described above. We also compared the variability of TAUC to the model estimates of run size. -->
 
-*Comment: Do we want to include simulations that examine the bias and precision of TAUC, compared to estimates from our model, as a function of survey density? The results (as a figure) show that TAUC is VERY ROBUST to survey density, but we can describe relative bias and relative loss of precision as survey gaps increase. We also examined how the TAUC in a year with few surveys compared to our model using repeated simulations (another figure), concluding that our model is more robust that TAUC in a year with few surveys.*
+<!-- *Comment: Do we want to include simulations that examine the bias and precision of TAUC, compared to estimates from our model, as a function of survey density? The results (as a figure) show that TAUC is VERY ROBUST to survey density, but we can describe relative bias and relative loss of precision as survey gaps increase. We also examined how the TAUC in a year with few surveys compared to our model using repeated simulations (another figure), concluding that our model is more robust that TAUC in a year with few surveys.* -->
 
 ## Further extensions to the model
 
@@ -760,9 +925,7 @@ If available, counts of newly dead spawners could provide further information to
 
 ### Autocorrelation within years
 
-Survey counts within a year are not independent, so it may be appropriate to add an autocorrelation structure to the residuals. We explored this in our model, but found that it did not improve predictive performance when applied to the Okanagan dataset. Furthermore, the model struggled to distinguish autocorrelation from overdispersion in the count data, leading to poor convergence. We therefore elected to use the simpler model that implicitly assumes independence of consecutive survey counts.
-
-<!--# "the model struggled to distinguish" means, maybe, those parameters are confounded somehow? Just thinking "struggled" is a bit anthropomorphic, albeit frequent. Also, observations (counts) are correlated, not dates or surveys. -->
+Survey counts within a year are not independent, so it may be appropriate to add an autocorrelation structure to the residuals. We explored this in our model, but found that it did not improve predictive performance when applied to the Okanagan dataset. Furthermore, convergence was poor because autocorrelation and overdispersion in the count data were not well distinguished. We therefore elected to use the simpler model that implicitly assumes independence of consecutive survey counts.
 
 ### Autocorrelation among years 
 
@@ -772,35 +935,18 @@ Salmon life cycles result in strong autocorrelations in spawner abundance that, 
 
 This modelling framework estimates the dynamics underlying the spawning period for salmon, providing annual estimates of key timing parameters that offer insight into the system's ecology. It also generates annual estimates of total spawner abundance, with associated uncertainty---the primary objective of spawner survey programs. This represents a substantial advancement over conventional TAUC approaches, while extending the GAUC and arrival-exit process modelling approaches. In doing so, we provide a way to extract greater insight into the abundance and ecology of salmon from data that are already routinely collected. This approach can support the sustainable management of salmon fisheries by providing more robust abundance estimates and a better understanding of the factors that govern spawning dynamics.
 
-<!-- # Recommendations -->
-
-<!-- I like this. But I don't know where it should go.  -->
-
-<!-- As a generalization, salmon datasets are not maintained following best practices ([@diack2024; @wilkinson2016]). As we discovered during this analysis, documenting survey methods, including data processing, is essential to avoid erroneous assumptions by analysts, such as our initial misinterpretation of counts of dead salmon. For examples, we point to the website [Monitoring Resources](MonitoringResources.org "MonitoringResources.org") maintained by the [**Pacific Northwest Aquatic Monitoring Partnership**](https://pnamp.org/)**.** -->
-
 # Acknowledgements
 
 Diligence, care, and persistence by survey field teams from the Okanagan Nations Alliance (ONA, [syilx.org](https://syilx.org/)) resulted in a spawners dataset based on unusually thorough and consistent methods; their commitment to *cause to come back* is inspiring. This paper commemorates accomplishments of the late Dr. Kim Hyatt who designed, implemented, and supported this survey program. We thank Karilyn Alex (ONA) for access and permission regarding this proprietary data, possible through the data sharing agreement of the Canadian Okanagan Basin Technical Working Group (COBTWG). We thank Howard Stiff and Athena Ogden (Pacific Biological Station, Fisheries and Oceans Canada) and Elizabeth Ng (Four Peaks Environmental Ltd.) for the work required to reconcile and summarize 25 years of field notes and spreadsheets into the quality controlled and standardized dataset we received. Dr. James R. Irvine (DFO Pacific, retired) improved the text based on his extensive knowledge of salmon surveys and related analyses. We used ChatGPT (model 4o) to proofread specific sections of the manuscript that were provided as text excepts, focusing on grammar, clarity, and accuracy. All AI generated suggested edits were assessed and verified for accuracy before being incorporated.
 
 ## Competing Interests
 
-The authors declares no competing interests.
-
-## Funding Statement
-
-The authors declares no specific funding for this work.
+The authors declare no competing interests.
 
 ## Data Availability
 
 The data used in this study are the property of the Okanagan Nations Alliance. Please contact them directly concerning availability and acknowledgements: [Sylix.org](sylix.org).
 
-# Figures {.unnumbered}
-
-not used
-
-# Tables {.unnumbered}
-
-not used
 
 # Supplementary Materials {.appendix}
 
@@ -808,27 +954,6 @@ not used
 \renewcommand{\thefigure}{S\arabic{figure}}
 \setcounter{figure}{0}
 ```
-
-Our selected model (m7), which uses a time-invariant $\mu^\text{exit lag}$, is specified as:\
-$$ 
-\begin{aligned} 
-N_{y,d} &\sim \text{NegBinomial}(\mu_{y,d}, \phi) \\
-\mu_{y,d} &=  \exp\left( \log\left(1 + 10^4 \times p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right) - \log(10^4) \right) \times N_y^{\text{spawners}} \\
-p^\text{arrived}_{y,d} &= \Phi\left( \frac{ d - \mu^\text{arrival}_y }{ \sigma^\text{arrival}_y } \right) \\
-p^\text{exited}_{y,d} &= \Phi\left( \frac{ d - (\mu^\text{arrival}_y + \mu^\text{exit lag})}{\sigma^\text{exit}_y} \right)\\
-\log(N_y^{\text{spawners}}) &\sim \text{Normal}(10, 1)\\
-\mu^\text{arrival}_y &\sim \text{Normal}(\mu^\text{arrival}_\mu, \mu^\text{arrival}_\sigma)\\
-\mu^\text{arrival}_\mu &\sim \text{Normal}(40, 5)\\
-\mu^\text{arrival}_\sigma &\sim \text{Exponential}(2)\\
-\log(\sigma^\text{arrival}_y-1) &\sim \text{Normal}(\sigma^\text{arrival}_\mu, \sigma^\text{arrival}_\sigma)\\
-\sigma^\text{arrival}_\mu &\sim \text{Normal}(\log(7), 0.2)\\
-\sigma^\text{arrival}_\sigma &\sim \text{Exponential}(10)\\
-\log(\mu^\text{exit lag}-1) &\sim \text{Normal}(\log(10), 0.3)\\
-\log(\sigma^\text{exit}_y - 1) &\sim \text{Normal}(\sigma^\text{exit}_\mu, \sigma^\text{exit}_\sigma)\\
-\sigma^\text{exit}_\mu &\sim \text{Normal}(\log(7), 0.2)\\
-\sigma^\text{exit}_\sigma &\sim \text{Exponential}(10).\\
-\end{aligned}
-$$ {#eq-fullmodel}
 
 ```{r fig-obsfit, echo = FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=5, fig.width=8, fig.cap = "Observed survey counts versus predicted on linear (A) and log (B) scales. Points and error bars show the posterior median and the 66% and 95% credible intervals.",}
 spread_draws(fit, live_mu[obs]) %>% 
@@ -852,18 +977,7 @@ spread_draws(fit, live_mu[obs]) %>%
   plot_annotation(tag_levels = "A")
 ```
 
-<!-- ![Newly dead spawners each day (blue) is the rate of exits. Newly dead accumulate between surveys, here with alternating 1 day and 4 day separations, leading to an irregular pattern of counts (red). Parameters as in preceding figure.](../figures/newly_dead.png){#fig-newlydead fig-align="center" width="4in"} -->
 
-The following documents are available for public access on [GitHub](https://github.com/SiRE-P/Multilevel-Spawners) and [Zenodo](https://support.zenodo.org/help/en-gb): FIX LINKS
-
-1.  spawners.stan – Stan code for the models
-
-2.  Spawners_est.R – This is the R code to run the Stan model and plot results.
-
-3.  Newly Dead Spawners.pdf – Simulations report as PDF.
-
-4.  Newly Dead Spawners.qmd – Simulation code to describe, run, and report the model.
-
-5.  newly dead spawners.stan – Stan code for simulations.
+All scripts and stan model code are available for public access on [GitHub](https://github.com/SiRE-P/Multilevel-Spawners) and [Zenodo](https://support.zenodo.org/help/en-gb): 
 
 # References {.unnumbered}
