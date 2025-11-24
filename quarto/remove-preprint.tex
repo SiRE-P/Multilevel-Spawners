@@ -1,0 +1,9 @@
+\makeatletter
+% Remove the preprint footer text
+\gdef\ps@pprintTitle{
+  \def\@oddhead{}%
+  \def\@evenhead{}%
+  \def\@oddfoot{}%
+  \def\@evenfoot{}%
+}
+\makeatother
