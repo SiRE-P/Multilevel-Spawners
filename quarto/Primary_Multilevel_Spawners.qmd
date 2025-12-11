@@ -1301,7 +1301,7 @@ from the trapezoidal AUC estimate with an assumed 11 day residence time.
 The traditional estimates fall within our 66% credible interval in
 `r sum(AUC_in_66$in_66)` out of `r length(AUC_in_66$in_66)` years.
 Across all years, our model estimates are a median of
-`r -(round(median(perc_diff$perc_diff), 1))`% lower than those based on
+`r (round(median(perc_diff$perc_diff), 1))`% higher than those based on
 TAUC (inter-annual range:
 `r round(min(perc_diff$perc_diff), 1)`--`r round(max(perc_diff$perc_diff), 1)`%).
 
