@@ -16,7 +16,7 @@ parameters {
   matrix[n_years, 4] timing_raw;
   
   vector[n_years] log_run;
-  real<lower=0>         live_phi;   // dispersion parameter on live fish sampling
+  real<lower=1>         live_phi;   // dispersion parameter on live fish sampling
   
 }
 
@@ -57,10 +57,10 @@ model {
   timing_mu[3] ~ normal(priors[6,1], priors[6,2]);  // exit_lag_mu
   timing_mu[4] ~ normal(priors[4,1], priors[4,2]);  // exit_spread_mu
   
-  timing_sigma[1] ~ exponential(priors[3,2]);  // arrival_sigma
-  timing_sigma[2] ~ exponential(priors[5,2]);  // arrival_spread_sigma
-  timing_sigma[3] ~ exponential(priors[5,2]);  // exit_lag_sigma
-  timing_sigma[4] ~ exponential(priors[5,2]);  // exit_spread_sigma
+  timing_sigma[1] ~ lognormal(log(priors[3,1]), priors[3,2]);  // arrival_sigma
+  timing_sigma[2] ~ lognormal(log(priors[5,1]), priors[5,2]);  // arrival_spread_sigma
+  timing_sigma[3] ~ lognormal(log(priors[5,1]), priors[5,2]);  // exit_lag_sigma
+  timing_sigma[4] ~ lognormal(log(priors[5,1]), priors[5,2]);  // exit_spread_sigma
   
   L_Omega ~ lkj_corr_cholesky(2);
   

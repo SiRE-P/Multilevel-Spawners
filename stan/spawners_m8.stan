@@ -23,7 +23,7 @@ parameters {
   real<lower=0> exit_lag_sigma;  
 
   // simple
-  real<lower=0>         live_phi;   // dispersion parameter on live fish sampling
+  real<lower=1>         live_phi;   // dispersion parameter on live fish sampling
   
   // instance in group, multi-level
   vector[n_years] log_run;
@@ -68,19 +68,19 @@ model {
   // group prior PDDs
   
   arrival_mu ~ normal(priors[2,1], priors[2,2]); 
-  arrival_sigma ~ exponential(priors[3,2]);                
+  arrival_sigma ~ lognormal(log(priors[3,1]), priors[3,2]);                
   arrival_z ~ normal(0, 1);             
   
   arrival_spread_mu  ~ normal(priors[4,1], priors[4,2]);  // 
-  arrival_spread_sigma ~ exponential(priors[5,2]);
+  arrival_spread_sigma ~ lognormal(log(priors[5,1]), priors[5,2]);
   arrival_spread_z ~ normal(0, 1);
   
   exit_spread_mu   ~ normal(priors[4,1], priors[4,2]);  // 
-  exit_spread_sigma ~ exponential(priors[5,2]);
+  exit_spread_sigma ~ lognormal(log(priors[5,1]), priors[5,2]);
   exit_spread_z ~ normal(0, 1);
   
   exit_lag_mu ~ normal(priors[6,1], priors[6, 2]);
-  exit_lag_sigma ~ exponential(priors[5,2]);
+  exit_lag_sigma ~ lognormal(log(priors[5,1]), priors[5,2]);
   exit_lag_z ~ normal(0, 1);
   
   // simple PDD
