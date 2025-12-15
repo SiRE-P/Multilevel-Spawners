@@ -1,27 +1,7 @@
 ---
 title: "Estimating spawning salmon abundance from visual surveys: a hierarchical model of arrival and exit dynamics"
 author:
-  - name: Scott A. Akenhead 
-    email: scott@s4s.com 
-    affiliations: 
-        - id: pbs 
-          name: Pacific Biological Station
-          department: Fisheries and Oceans Canada
-          address: 3190 Hammond Bay Road
-          city: Nanaimo
-          state: BC, Canada
-          postal-code: V9T 6N7
-    note: (retired).
-  - name: Colette Louie
-    email: CLouie@oib.ca
-    affiliations:
-        - id: OIB
-          name: Osoyoos Indian Band
-          address: 1155 Sen Pok Chin Blvd
-          city: Oliver
-          state: BC, Canada
-          postal-code: V0H 1T3
-  - name: Patrick L. Thompson
+  - name: "Patrick L. Thompson \\fnref{t1}"
     email: patrick.thompson@dfo-mpo.gc.ca
     affiliations:
         - id: psec
@@ -33,10 +13,35 @@ author:
           postal-code: V7V 1H2
     attributes:
         corresponding: true
+  - name: "Scott A. Akenhead \\fnref{t1,t2}"
+    email: scott@s4s.com 
+    affiliations: 
+        - id: pbs 
+          name: Pacific Biological Station
+          department: Fisheries and Oceans Canada
+          address: 3190 Hammond Bay Road
+          city: Nanaimo
+          state: BC, Canada
+          postal-code: V9T 6N7
+    attributes:
+        equal-contributor: true
+  - name: Colette Louie
+    email: CLouie@oib.ca
+    affiliations:
+        - id: OIB
+          name: Osoyoos Indian Band
+          address: 1155 Sen Pok Chin Blvd
+          city: Oliver
+          state: BC, Canada
+          postal-code: V0H 1T3
+header-includes: |
+  \fntext[t1]{These authors should be considered joint first authors.}
+  \fntext[t2]{Retired.}
 date: last-modified
 bibliography: bibliography.bib
 abstract: |
-  Spawner abundance is a fundamental variable for salmon management models, but conventional methods (trapezoidal area under the curve, TAUC) do not estimate the precision of abundance and risk bias from an assumed residence time (aka survey life, to correct for observing a salmon in repeated surveys). Here we present a model that predicts visual counts of spawners by modelling the process and timing of spawner arrivals and exits from the spawning ground. Our model analyses all surveys simultaneously using a hierarchical framework, providing annual estimates of spawner abundance, arrival timing, arrival spread, exit timing, and exit spread with associated uncertainties. By directly estimating these parameters and integrating uncertainty into abundance estimates, our approach improves the accuracy and reliability of spawner abundance estimates. We first demonstrate how the model accurately recovers parameters from simulated data, then we demonstrate its application by estimating 25 years of spawner abundance of wild sockeye salmon (_Oncorhynchus nerka_) in the Okanagan River (BC, Canada). Our median estimated residence time of 10.4 days is similar to the constant 11 days previously assumed for this population, but varies by year. While our estimates of spawner abundance are similar to previous estimates that used TAUC with a constant residence time, there are deviations in some years due to interannual changes in residence time.
+  Spawner abundance is a fundamental variable for salmon management models, but conventional methods (trapezoidal area under the curve) do not estimate the precision of abundance and risk bias from an assumed residence time. Here we present a hierarchical model that predicts visual counts of spawners by modelling the process and timing of spawner arrivals and exits. Our model provides annual estimates of spawner abundance, arrival timing, arrival spread, exit timing, and exit spread. By directly estimating these parameters and integrating uncertainty into abundance estimates, our approach improves the accuracy and reliability of spawner abundance estimates. We first demonstrate how the model accurately recovers parameters from simulated data, and then demonstrate its application by estimating 25 years of spawner abundance of wild sockeye salmon in the Okanagan River (BC, Canada). Our median estimated residence time of 9.1 days is shorter than the constant 11 days previously assumed for this population, and has considerable interannual variation (6.2-16.5 days). Thus, our estimated abundances are 15.7% higher, on average, but deviations can be much larger in individual years.
+
 keywords: 
   - salmon
   - Oncorhynchus
@@ -1290,7 +1295,7 @@ to as high as
 Since 2008, spawner abundance has alternated between low and high levels
 in a two-year cycle.
 
-Our estimated annual abundances are broadly consistent with trapezoidal AUC estimates with an assumed 11 day residence time, but are typically higher: the median across years is `r (round(median(perc_diff$perc_diff), 1))`% higher and the interannual range is from
+Our estimated annual abundances are but are typically higher than those using trapezoidal AUC estimates with an assumed 11 day residence time: the median across years is `r (round(median(perc_diff$perc_diff), 1))`% higher and the interannual range is from
 `r round(min(perc_diff$perc_diff), 1)` to `r round(max(perc_diff$perc_diff), 1)`%. The traditional estimates fall within our 66% credible interval in
 `r sum(AUC_in_66$in_66)` out of `r length(AUC_in_66$in_66)` years and within our 95% credible intervals in `r sum(AUC_in_66$in_95)` years.
 
@@ -1331,7 +1336,7 @@ well as insights into its ecology.
 Our simulations demonstrate that the model is able to estimate parameter
 values reliably. The true estimates fall within our 95% credible intervals in at least 95% of the years. The precision decreases as we increase the gaps between surveys, as is expected. But, we find that the model does not tend to be biased in its ability to estimate the parameters, with the exception of exit lag, which is often overestimated. Reassuringly, log run size, which is the primary variable of interest in spawner enumeration surveys, seems to be the most robust parameter to low survey frequency.
 
-## Residence time
+## Residence time and spawner abundance
 
 Estimating four parameters for spawner timing directly from the spawner
 surveys represents an important advance over methods that rely on an
@@ -1344,17 +1349,20 @@ each year. This idea is not new; @hilborn1999 demonstrated how residence
 time could be estimated from visual spawner data. As in @su2001 and
 @adkison2001, our method uses a hierarchical structure to estimate
 interannual variability in the timing parameters, while reducing the
-risk of overfitting to noisy or sparse data. In our application to
-Okanagan sockeye, we estimate the median *effective residence* *time* to
-be `r round(median(effective_residence), 1)` days, which is close to the
-previously assumed 11 days [@hyatt2010], but lower than the 11.9 to 14.1
+risk of overfitting to noisy or sparse data. 
+
+In our application to Okanagan sockeye, we estimate the median *effective residence* *time* to
+be `r round(median(effective_residence), 1)` days, which is lower than the
+previously assumed 11 days [@hyatt2010], and the 11.9 to 14.1
 day estimates based on tilt tags in 2006 and 2007 [@shardlow2011].
-However, effective residence time varies across years from
+Furthermore, effective residence time varies across years from
 `r round(min(apply(effective_residence, 2, median)), 1)` to
 `r round(max(apply(effective_residence, 2, median)), 1)` days,
-suggesting that assuming a fixed value introduces bias in some years.
-Comparing our annual estimates in 2006 and 2007 to those from
-@shardlow2011, we find that our estimates are still lower. In 2006, our
+suggesting that assuming a fixed value introduces considerable bias in the spawner abundance estimates in some years. This is reflected in the fact that our estimated spawner abundances range from as low as `r -round(min(perc_diff$perc_diff), 1)`% lower to `r round(max(perc_diff$perc_diff), 1)`% higher than those estimated using TAUC with an assumed 11 day residence. 
+
+
+Comparing our annual estimates of effective residence time in 2006 and 2007 to those from
+@shardlow2011, we find that our estimates are also lower. In 2006, our
 median residence time is
 `r round(apply(effective_residence, 2, median), 1)[7]` days (95% CI =
 `r round(quantile(effective_residence[,7], probs = 0.025), 1)`-`r round(quantile(effective_residence[,7], probs = 0.975), 1)`)
@@ -1589,9 +1597,9 @@ clarity, and accuracy. All AI generated suggested edits were assessed
 and verified for accuracy before being incorporated.
 
 ## Author contributions  
-Scott A. Akenhead: Conceptualization, Methodology, Formal Analysis, Software (initial model and simulation code), Writing – Original Draft, Review & Editing.  
 Patrick L. Thompson: Methodology, Formal Analysis, Software (final models and simulations), Validation, Visualization, Writing – Original Draft, Review & Editing.  
-CL: Investigation (spawner enumeration surveys), Data curation, Resources.
+Scott A. Akenhead: Conceptualization, Methodology, Formal Analysis, Software (initial model and simulation code), Writing – Original Draft, Review & Editing.  
+Colette Louie: Investigation (spawner enumeration surveys), Data curation, Resources.
 
 ## Competing Interests
 
