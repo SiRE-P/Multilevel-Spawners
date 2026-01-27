@@ -2,4 +2,4 @@ Estimating spawning salmon abundance from visual surveys: a hierarchical model o
 
 Patrick L. Thompson, Scott A. Akenhead, Colette Louie
 
-This repository contains the files needed to produce this manuscript. The full reproducible analysis, including running the Stan models and producing the pdf, is all done in the /markdown/multilevel_spawners.Rmd file. 
+This repository contains the files needed to produce this manuscript. The full reproducible analysis, including running the Stan models and producing the pdf, is all done in the /markdown/multilevel_spawners.Rmd file. Note the raw survey data used in this study are the property of the Okanagan Nation Alliance. Please contact them directly concerning availability and acknowledgements: sylix.org.
