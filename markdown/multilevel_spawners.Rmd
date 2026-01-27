@@ -881,7 +881,7 @@ days in 2006, and 14.1 (females) and 11.9 (males) days in 2007.
 Nevertheless, 11 days has been the consistently assumed value for AUC
 estimates in this system [@machin2019].
 
-```{r fig-map, echo = FALSE, warning=FALSE, message=FALSE, fig.cap = "The spawning grounds for Sockeye Salmon population that rear as fry in the North Basin of Osoyoos Lake are 20 to 30 km upstream of the lake, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. River flows that affect spawners, eggs, and fry are monitored by Environment Canada (station 08NM085, also called station 08NM0001). Map by Braden Judson, Pacific Biological Station.", out.width="5in"}
+```{r fig-map, echo = FALSE, warning=FALSE, message=FALSE, fig.cap = "The spawning grounds for Sockeye Salmon population that rear as fry in the North Basin of Osoyoos Lake are 20 to 30 km upstream of the lake, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. River flows that affect spawners, eggs, and fry are monitored by Environment Canada (station 08NM085, also called station 08NM0001). Map produced by Fisheries and Oceans Canada.", out.width="5in"}
 
 knitr::include_graphics("../figures/Okanagan_to_Osoyoo_Lakes.png")
 ```
