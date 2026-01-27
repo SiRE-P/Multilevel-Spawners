@@ -1,0 +1,5 @@
+Estimating spawning salmon abundance from visual surveys: a hierarchical model of arrival and exit dynamics
+
+Patrick L. Thompson, Scott A. Akenhead, Colette Louie
+
+This repository contains the files needed to produce this manuscript. The full reproducible analysis, including running the Stan models and producing the pdf, is all done in the /markdown/multilevel_spawners.Rmd file. 
