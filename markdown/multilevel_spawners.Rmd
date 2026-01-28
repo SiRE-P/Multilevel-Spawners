@@ -843,18 +843,6 @@ additional complexity in our simulations.
 
 We quantified coverage as the proportion of simulations in which the true value fell within the 95% posterior credible interval. We quantified precision as the median absolute deviation (MAD, a robust version of standard deviation) of the posterior draws around the median, and quantified bias as the median of ratios of fitted over true values. 
 
-
-```{r tbl-sim, echo=FALSE, warning=FALSE, message=FALSE}
-knitr::kable(
-  sim_params,
-  caption   = "Simulation parameters used in the study.",
-  booktabs = TRUE,
-  linesep = "",
-  longtable = TRUE
-) |>
-  kableExtra::kable_styling(latex_options = "repeat_header")
-```
-
 ## Okanagan sockeye
 
 Our analysis of Okanagan sockeye was confined to the population of wild
@@ -881,19 +869,14 @@ days in 2006, and 14.1 (females) and 11.9 (males) days in 2007.
 Nevertheless, 11 days has been the consistently assumed value for AUC
 estimates in this system [@machin2019].
 
-```{r fig-map, echo = FALSE, warning=FALSE, message=FALSE, fig.cap = "The spawning grounds for Sockeye Salmon population that rear as fry in the North Basin of Osoyoos Lake are 20 to 30 km upstream of the lake, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. River flows that affect spawners, eggs, and fry are monitored by Environment Canada (station 08NM085, also called station 08NM0001). Map produced by Fisheries and Oceans Canada.", out.width="5in"}
-
-knitr::include_graphics("../figures/Okanagan_to_Osoyoo_Lakes.png")
-```
-
 ## Spawner surveys
 
-Spawner enumeration surveys have been conducted in the main sockeye
+Spawner enumeration surveys have been conducted by the Okanagan Nation Alliance in the main sockeye
 spawning area---also known as the Index Section---of the Okanagan river (Figure \ref{fig:fig-map}) since
 `r min(index_sk$year)`. The Index Section consists of the section from
 Deer Park to vertical drop structure 12 (VDS12), which is at the Oliver
 bridge. Survey methods are described in detail in
-@machin2019. Weekly surveys during the initial migration phase are
+@machin2019. No fieldwork permit was required for the surveys as they are visual counts and they fall within the Syilx title and rights regarding Okanagan sockeye. Weekly surveys during the initial migration phase are
 increased to three-day intervals during the peak spawning period
 (generally October-November). A three or four person crew performs
 visual surveys of the Index section from a boat. Two observers focus on
@@ -963,77 +946,6 @@ Convergence was good for model 9; the highest $\hat{R}$ was
 parameters had effective sample sizes $>400$ (min =
 `r round(min(worst_Rhat$n_eff, na.rm = TRUE))`).
 
-```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= 'center', fig.cap= "Model summary and comparison. *Panel A* shows which parameters or model structure that were held constant or not included (white) versus those that varied or were included (black) in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. *Panel C* shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors. Note, that the x-axis in panel B is pseudo log transformed (inverse hyperbolic sine) to highlight differences among the best performing models."}
-
-signed_log10_trans <- trans_new(
-  name = "signed_log10",
-  transform = function(x) sign(x) * log10(abs(x)),
-  inverse = function(x) sign(x) * 10^abs(x)
-)
-
-data.frame(model = 1:9,
-           arrival = c("constant/not included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included"), 
-           arrival_spread = c("constant/not included", "constant/not included","varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included", "varies/included"), 
-           exit_spread = c("constant/not included", "constant/not included", "constant/not included", "varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included"),
-           residence = c("constant/not included", "constant/not included", "constant/not included", "constant/not included", "varies/included", "varies/included", "constant/not included", "varies/included", "varies/included"),
-           MVN = c(rep("constant/not included", 8), "varies/included")) %>%
-  gather(key = parameter, value = value, -model) %>% 
-  mutate(parameter = factor(parameter, levels = c("arrival", "arrival_spread", "exit_spread", "residence", "MVN"))) |> 
-  ggplot(aes(x = parameter, y = model, fill = value))+
-  geom_tile(color = "grey")+
-  scale_fill_manual(values = c("NA", "black"), "")+
-  scale_y_reverse(breaks = 1:9)+
-  theme(legend.position = "bottom")+
-  coord_cartesian(expand = FALSE)+
-  theme(panel.grid = element_blank(),
-        axis.ticks = element_blank())+
-  labs(x = "Parameter or model structure", y = "Model")+
-  scale_x_discrete(
-    labels = c(
-      "arrival" = expression(mu[y]^arrival),
-      "arrival_spread" = expression(sigma[y]^arrival),
-      "exit_spread" = expression(sigma[y]^exit),
-      "residence" = expression(mu[y]^"exit lag"),
-      "AR" = "AR"
-    )
-  )+
-  theme_bw()+
-  theme(panel.grid = element_blank(), legend.position = "bottom")+
-  
-  
-  ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
-  geom_hline(yintercept = 0, linetype = 2)+
-  geom_point(size = 2) +
-  geom_errorbar(aes(ymin = dloo - se, ymax = dloo + se), width = 0) +
-  coord_flip() +
-  scale_y_continuous(trans = pseudolog10_trans, breaks = c(-100, -10, -1))+
-  scale_x_reverse(breaks = 1:9)+
-  labs(
-    x = "",
-    y = expression(Delta*ELPD~"(rel. to best)")
-  )+
-  theme(panel.grid.minor.x = element_blank())+
-  scale_color_manual(values = c(1, "red"), guide = "none")+
-  theme_bw()+
-  
-  ggplot(loo_df, aes(x = model, y = p_loo, color = dloo==0)) +
-  geom_point(size = 2) +
-  geom_errorbar(aes(ymin = p_loo - se_p_loo, ymax = p_loo  + se_p_loo), width = 0) +
-  coord_flip() +
-  scale_x_reverse(breaks = 1:9)+
-  labs(
-    x = "",
-    y = expression("effective parameters (" * p[loo] * ")")
-  )+
-  scale_color_manual(values = c(1, "red"), guide = "none")+
-  theme_bw()+
-  theme(panel.grid.minor.x = element_blank())+
-  
-  
-  plot_annotation(tag_levels = "A")+
-  plot_layout(widths = c(1, 0.5, 0.5))
-```
-
 ## Model fit to simulated data
 
 We find that the model is able to estimate the parameters used to
@@ -1085,37 +997,7 @@ overdispersion ($\phi^\mathrm{live}$), which had a posterior median of
 `r round(median(post$live_phi), 1)` (95% CI:
 `r round(quantile(post$live_phi, 0.025), 1)`--`r round(quantile(post$live_phi, 0.975), 1)`).
 
-```{r fig-spawnercurves, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Observed versus estimated spawners present over the spawning period in each year (panels). Points show the observed counts; the lines and shaded bands show the posterior median and the 95% credible intervals. Y-axis limits vary across panels to emphasize model fit rather than variation across years.", fig.align='center', fig.height=7, fig.width=8}
-spawn_curves.df <- data.frame()
-for(j in 1:ncol(post$log_run)){
-  live <- sapply(-5:max(sp_dat$day), FUN = function(x) {
-    entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
-    exited <- pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j])
-    
-    exp(post$log_run[,j] + log(entered - (entered * exited)))
-  }
-  )
-  spawn_curves.df <- bind_rows(spawn_curves.df, data.frame(
-    year = j + min(spawners$year)-1, 
-    day = -5:max(sp_dat$day)+day_stand,
-    fish = apply(live, 2, median),
-    l95 = apply(live, 2, quantile, probs = 0.025),
-    u95 = apply(live, 2, quantile, probs = 0.975)))
-}
 
-ggplot(spawn_curves.df, aes(x = day, y = fish))+
-  geom_line()+
-  geom_ribbon(aes(ymin = l95, ymax = u95), color = NA, alpha = 0.2)+
-  facet_wrap(~year, scales = "free_y")+
-  geom_point(data = index_sk, aes(x = yday, y = live), size = 0.8)+
-  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners present (thousands)", expand = expansion(mult = c(0, 0.05)))+
-  theme_bw()+
-  theme(strip.background = element_rect(color="NA", fill="NA"))+
-  scale_x_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b"), 
-                     breaks = as.numeric(as.Date(c("2024-09-01", "2024-10-01", "2024-11-01")) - as.Date("2023-12-31")), name = "")+
-  theme(panel.grid.minor = element_blank())
-
-```
 
 ```{r effective-residence, include = FALSE}
 effective_residence <- matrix(NA, nrow = length(post$log_run[,1]), ncol = ncol(post$log_run))
@@ -1160,7 +1042,7 @@ across years is `r round(median(effective_residence), 1)` days, but it
 ranges from `r round(min(apply(effective_residence, 2, median)), 1)` to
 `r round(max(apply(effective_residence, 2, median)), 1)` days.
 
-```{r fig-timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of annual mean arrival ($\\mu_y^{\\text{arrival}}$; A), arrival spread ($\\sigma_y^{\\text{arrival}}$; B), exit spread ($\\sigma_y^{\\text{exit}}$; C), and the resulting mean residence time ($\\mu^{\\text{residence}}_y$; D). The dashed line in panel D shows the previously assumed 11 day residence time. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=9, fig.width=6}
+```{r fig-timings, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Posterior distributions of annual mean arrival ($\\mu_y^{\\text{arrival}}$; A), arrival spread ($\\sigma_y^{\\text{arrival}}$; B), exit spread ($\\sigma_y^{\\text{exit}}$; C), and the resulting mean residence time ($\\mu^{\\text{residence}}_y$; D). The dashed line in panel D shows the previously assumed 11 day residence time. Points and error bars show the posterior median and the 66% and 95% credible intervals.", fig.align='center', fig.height=8.5, fig.width=5.5}
 spread_draws(fit, arrival[year]) %>% 
   mutate(year = year + min(spawners$year)-1) %>%
   ggplot(aes(x = year, y = arrival + day_stand))+
@@ -1212,36 +1094,6 @@ spread_draws(fit, arrival[year]) %>%
   plot_annotation(tag_levels = "A")
 ```
 
-```{r fig-cor, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Estimated pariwise correlations between the four timing parameters. The colour shows the posterior median value; numbers indicate the proportion of the posterior with the same sign.", fig.align='center', fig.height=4, fig.width=5}
-
-param_labels <- c(
-  "1" = expression(mu[y]^arrival),
-  "2" = expression(sigma[y]^arrival),
-  "3" = expression(sigma[y]^exit),
-  "4" = expression(mu[y]^exit_lag)
-)
-
-spread_draws(fit, Omega[parameter1, parameter2]) %>%
-  filter(parameter1 < parameter2) %>% 
-  group_by(parameter1, parameter2) %>% 
-  summarise(
-    correlation = median(Omega),
-    prop_positive = mean(Omega > 0),
-    prop_negative = mean(Omega < 0)
-  ) %>% 
-  mutate(
-    prop_direction = ifelse(prop_positive > prop_negative, prop_positive, prop_negative)
-  ) %>%
-  ggplot(aes(x = factor(parameter1), y = factor(parameter2), fill = correlation)) +
-  geom_tile() +
-  geom_text(aes(label = sprintf("%.2f", prop_direction)), color = "black") +
-  scale_fill_gradient2(low = "dodgerblue", high = "red", name = "Correlation") +
-  scale_x_discrete(labels = param_labels) +
-  scale_y_discrete(labels = param_labels) +
-  xlab("") + ylab("") +
-  theme_bw()
-```
-
 ## Total spawner abundance
 
 ```{r AUCvsmodel, include = FALSE}
@@ -1286,7 +1138,7 @@ Estimated posterior median annual spawner abundances
 `r which(apply(exp(post$log_run), 2, median) == min(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1`
 to as high as
 `r scales::comma(round(max(apply(exp(post$log_run), 2, median)),-3))` in
-`r which(apply(exp(post$log_run), 2, median) == max(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1`.
+`r which(apply(exp(post$log_run), 2, median) == max(apply(exp(post$log_run), 2, median))) + min(spawners$year)-1` (Figure \ref{fig:fig-runs}).
 Since 2008, spawner abundance has alternated between low and high levels
 in a two-year cycle.
 
@@ -1621,6 +1473,18 @@ This study was supported by a Collaborative Agreement between Fisheries and Ocea
 \setcounter{table}{0}
 ```
 
+```{r tbl-sim, echo=FALSE, warning=FALSE, message=FALSE}
+knitr::kable(
+  sim_params,
+  caption   = "Simulation parameters used in the study.",
+  booktabs = TRUE,
+  linesep = "",
+  longtable = TRUE
+) |>
+  kableExtra::kable_styling(latex_options = "repeat_header")
+```
+
+
 ```{r tbl-init, echo=FALSE, warning=FALSE, message=FALSE}
 init.df <- data.frame(parameter = c("log_run", "arrival_mu", "arrival_sigma", "arrival_spread_mu", "exit_spread_mu", "exit_lag_mu", "phi"), 
            dist = c("Normal", "Normal", "Lognormal", "Normal", "Normal", "Normal", "Lognormal"),
@@ -1637,6 +1501,114 @@ knitr::kable(
   kableExtra::kable_styling(latex_options = "repeat_header")
 ```
 
+```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= 'center', fig.cap= "Model summary and comparison. *Panel A* shows which parameters or model structure that were held constant or not included (white) versus those that varied or were included (black) in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. *Panel C* shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors. Note, that the x-axis in panel B is pseudo log transformed (inverse hyperbolic sine) to highlight differences among the best performing models."}
+
+signed_log10_trans <- trans_new(
+  name = "signed_log10",
+  transform = function(x) sign(x) * log10(abs(x)),
+  inverse = function(x) sign(x) * 10^abs(x)
+)
+
+data.frame(model = 1:9,
+           arrival = c("constant/not included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included"), 
+           arrival_spread = c("constant/not included", "constant/not included","varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included", "varies/included"), 
+           exit_spread = c("constant/not included", "constant/not included", "constant/not included", "varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included"),
+           residence = c("constant/not included", "constant/not included", "constant/not included", "constant/not included", "varies/included", "varies/included", "constant/not included", "varies/included", "varies/included"),
+           MVN = c(rep("constant/not included", 8), "varies/included")) %>%
+  gather(key = parameter, value = value, -model) %>% 
+  mutate(parameter = factor(parameter, levels = c("arrival", "arrival_spread", "exit_spread", "residence", "MVN"))) |> 
+  ggplot(aes(x = parameter, y = model, fill = value))+
+  geom_tile(color = "grey")+
+  scale_fill_manual(values = c("NA", "black"), "")+
+  scale_y_reverse(breaks = 1:9)+
+  theme(legend.position = "bottom")+
+  coord_cartesian(expand = FALSE)+
+  theme(panel.grid = element_blank(),
+        axis.ticks = element_blank())+
+  labs(x = "Parameter or model structure", y = "Model")+
+  scale_x_discrete(
+    labels = c(
+      "arrival" = expression(mu[y]^arrival),
+      "arrival_spread" = expression(sigma[y]^arrival),
+      "exit_spread" = expression(sigma[y]^exit),
+      "residence" = expression(mu[y]^"exit lag"),
+      "AR" = "AR"
+    )
+  )+
+  theme_bw()+
+  theme(panel.grid = element_blank(), legend.position = "bottom")+
+  
+  
+  ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
+  geom_hline(yintercept = 0, linetype = 2)+
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = dloo - se, ymax = dloo + se), width = 0) +
+  coord_flip() +
+  scale_y_continuous(trans = pseudolog10_trans, breaks = c(-100, -10, -1))+
+  scale_x_reverse(breaks = 1:9)+
+  labs(
+    x = "",
+    y = expression(Delta*ELPD~"(rel. to best)")
+  )+
+  theme(panel.grid.minor.x = element_blank())+
+  scale_color_manual(values = c(1, "red"), guide = "none")+
+  theme_bw()+
+  
+  ggplot(loo_df, aes(x = model, y = p_loo, color = dloo==0)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = p_loo - se_p_loo, ymax = p_loo  + se_p_loo), width = 0) +
+  coord_flip() +
+  scale_x_reverse(breaks = 1:9)+
+  labs(
+    x = "",
+    y = expression("effective parameters (" * p[loo] * ")")
+  )+
+  scale_color_manual(values = c(1, "red"), guide = "none")+
+  theme_bw()+
+  theme(panel.grid.minor.x = element_blank())+
+  
+  
+  plot_annotation(tag_levels = "A")+
+  plot_layout(widths = c(1, 0.5, 0.5))
+```
+
+```{r fig-map, echo = FALSE, warning=FALSE, message=FALSE, fig.cap = "The spawning grounds for Sockeye Salmon population that rear as fry in the North Basin of Osoyoos Lake are 20 to 30 km upstream of the lake, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. River flows that affect spawners, eggs, and fry are monitored by Environment Canada (station 08NM085, also called station 08NM0001). Map produced by Margot Stockwell, Fisheries and Oceans Canada.", out.width="5in"}
+
+knitr::include_graphics("../figures/Okanagan_to_Osoyoo_Lakes.png")
+```
+
+
+```{r fig-spawnercurves, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Observed versus estimated spawners present over the spawning period in each year (panels). Points show the observed counts; the lines and shaded bands show the posterior median and the 95% credible intervals. Y-axis limits vary across panels to emphasize model fit rather than variation across years.", fig.align='center', fig.height=7, fig.width=8}
+spawn_curves.df <- data.frame()
+for(j in 1:ncol(post$log_run)){
+  live <- sapply(-5:max(sp_dat$day), FUN = function(x) {
+    entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
+    exited <- pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j])
+    
+    exp(post$log_run[,j] + log(entered - (entered * exited)))
+  }
+  )
+  spawn_curves.df <- bind_rows(spawn_curves.df, data.frame(
+    year = j + min(spawners$year)-1, 
+    day = -5:max(sp_dat$day)+day_stand,
+    fish = apply(live, 2, median),
+    l95 = apply(live, 2, quantile, probs = 0.025),
+    u95 = apply(live, 2, quantile, probs = 0.975)))
+}
+
+ggplot(spawn_curves.df, aes(x = day, y = fish))+
+  geom_line()+
+  geom_ribbon(aes(ymin = l95, ymax = u95), color = NA, alpha = 0.2)+
+  facet_wrap(~year, scales = "free_y")+
+  geom_point(data = index_sk, aes(x = yday, y = live), size = 0.8)+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners present (thousands)", expand = expansion(mult = c(0, 0.05)))+
+  theme_bw()+
+  theme(strip.background = element_rect(color="NA", fill="NA"))+
+  scale_x_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b"), 
+                     breaks = as.numeric(as.Date(c("2024-09-01", "2024-10-01", "2024-11-01")) - as.Date("2023-12-31")), name = "")+
+  theme(panel.grid.minor = element_blank())
+
+```
 
 ```{r fig-obsfit, echo = FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=5, fig.width=8, fig.cap = "Observed survey counts versus predicted on linear (A) and log (B) scales. Points and error bars show the posterior median and the 66% and 95% credible intervals.",}
 spread_draws(fit, live_mu[obs]) %>% 
@@ -1660,3 +1632,32 @@ spread_draws(fit, live_mu[obs]) %>%
   plot_annotation(tag_levels = "A")
 ```
 
+```{r fig-cor, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Estimated pariwise correlations between the four timing parameters. The colour shows the posterior median value; numbers indicate the proportion of the posterior with the same sign.", fig.align='center', fig.height=4, fig.width=5}
+
+param_labels <- c(
+  "1" = expression(mu[y]^arrival),
+  "2" = expression(sigma[y]^arrival),
+  "3" = expression(sigma[y]^exit),
+  "4" = expression(mu[y]^exit_lag)
+)
+
+spread_draws(fit, Omega[parameter1, parameter2]) %>%
+  filter(parameter1 < parameter2) %>% 
+  group_by(parameter1, parameter2) %>% 
+  summarise(
+    correlation = median(Omega),
+    prop_positive = mean(Omega > 0),
+    prop_negative = mean(Omega < 0)
+  ) %>% 
+  mutate(
+    prop_direction = ifelse(prop_positive > prop_negative, prop_positive, prop_negative)
+  ) %>%
+  ggplot(aes(x = factor(parameter1), y = factor(parameter2), fill = correlation)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", prop_direction)), color = "black") +
+  scale_fill_gradient2(low = "dodgerblue", high = "red", name = "Correlation") +
+  scale_x_discrete(labels = param_labels) +
+  scale_y_discrete(labels = param_labels) +
+  xlab("") + ylab("") +
+  theme_bw()
+```
