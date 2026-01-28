@@ -255,8 +255,8 @@ across multiple days during the spawning period. As part of the survey
 process, counts are adjusted for observer efficiency (estimated percent observed
 of salmon present, @hilborn1999) and extrapolated to survey areas not
 observed. Those adjustments are not considered in what follows.
-Converting repeated daily estimates of spawners *present* into a yearly
-estimate of spawner *abundance* requires accounting for two factors: (1)
+Converting repeated daily estimates of spawners present into a yearly
+estimate of spawner abundance requires accounting for two factors: (1)
 surveys typically do not cover every day of the spawning period, and (2)
 spawning fish generally remain on the spawning grounds for multiple
 days: 8.8-18.7 days for sockeye salmon; @perrin1990. Conventional
@@ -273,7 +273,7 @@ first and last dates for presence of spawners is required and often
 assumed. The resulting integral has units of $fish \times days$. To
 account for repeat observations of individual fish, total spawner
 abundance is calculated by dividing $fish \times days$ by the average
-**residence time** (survey life, $days$) of a spawner on the surveyed
+residence time (survey life, $days$) of a spawner on the surveyed
 spawning ground. Residence time has been found to vary across years and
 across spawning grounds, so it is recommended that annual,
 spawning-ground-specific estimates should be used [@bocking1988;
@@ -309,7 +309,7 @@ initially developed for salmon by @quinn1997, the number of spawners
 present during a survey is the number of arrivals cumulative to a survey date, minus
 exits cumulative to that date (Figure \ref{fig:fig-enterexit}). Residence time, as the
 lag between mean arrival date and mean exit date (we later refer to this
-as *exit lag*), was then an estimated parameter rather than an
+as exit lag), was then an estimated parameter rather than an
 assumption. In the subsequent model by @hilborn1999, arrivals and exits
 were assumed to follow the same cumulative distribution. @su2001 and
 @adkison2001 extended this framework to make residence time a declining
@@ -323,11 +323,11 @@ to estimate spawner abundance.
 
 This paper introduces further evolution of the arrival-exit approach
 [e.g., @hilborn1999; @su2001]. Our model differs from previous approaches by
-estimating four timing parameters: (1) **arrival timing**, the average
-day of spawner arrivals; (2) **arrival spread**, the variation (as
+estimating four timing parameters: (1) arrival timing, the average
+day of spawner arrivals; (2) arrival spread, the variation (as
 standard deviation, assuming normal distribution) in spawner arrival dates; (3)
-**exit lag**, the difference between mean arrival date and mean exit
-date; and (4) **exit spread**: the variation in exit timing
+exit lag, the difference between mean arrival date and mean exit
+date; and (4) exit spread: the variation in exit timing
 (Figure \ref{fig:fig-enterexit}). This avoids imposing a specific function relating
 arrival date and residence time, as in @su2001. As a further
 improvement, we model the timing parameters as a multivariate normal
@@ -1501,7 +1501,7 @@ knitr::kable(
   kableExtra::kable_styling(latex_options = "repeat_header")
 ```
 
-```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= 'center', fig.cap= "Model summary and comparison. *Panel A* shows which parameters or model structure that were held constant or not included (white) versus those that varied or were included (black) in each of the candidate models (rows). *Panel B* shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. *Panel C* shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors. Note, that the x-axis in panel B is pseudo log transformed (inverse hyperbolic sine) to highlight differences among the best performing models."}
+```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= 'center', fig.cap= "Model summary and comparison. Panel A shows which parameters or model structure that were held constant or not included (white) versus those that varied or were included (black) in each of the candidate models (rows). Panel B shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. Panel C shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors. Note, that the x-axis in panel B is pseudo log transformed (inverse hyperbolic sine) to highlight differences among the best performing models."}
 
 signed_log10_trans <- trans_new(
   name = "signed_log10",
