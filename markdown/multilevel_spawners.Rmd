@@ -273,7 +273,7 @@ first and last dates for presence of spawners is required and often
 assumed. The resulting integral has units of $fish \times days$. To
 account for repeat observations of individual fish, total spawner
 abundance is calculated by dividing $fish \times days$ by the average
-residence time (survey life, $days$) of a spawner on the surveyed
+residence time (survey life or stream life, $days$) of a spawner on the surveyed
 spawning ground. Residence time has been found to vary across years and
 across spawning grounds, so it is recommended that annual,
 spawning-ground-specific estimates should be used [@bocking1988;
@@ -307,10 +307,7 @@ Mechanistic models of the arrival and exit processes [@szerlong2008]
 address some of the limitations of the TAUC and GAUC approaches. As
 initially developed for salmon by @quinn1997, the number of spawners
 present during a survey is the number of arrivals cumulative to a survey date, minus
-exits cumulative to that date (Figure \ref{fig:fig-enterexit}). Residence time, as the
-lag between mean arrival date and mean exit date (we later refer to this
-as exit lag), was then an estimated parameter rather than an
-assumption. In the subsequent model by @hilborn1999, arrivals and exits
+exits cumulative to that date (Figure \ref{fig:fig-enterexit}). Average residence time was then an estimated parameter rather than an assumption. In the subsequent model by @hilborn1999, arrivals and exits
 were assumed to follow the same cumulative distribution. @su2001 and
 @adkison2001 extended this framework to make residence time a declining
 function of arrival date. They also allowed for interannual variation
@@ -319,7 +316,8 @@ hierarchical regression to improve estimates in years with sparse data.
 Further variations were explored by @labelle2021, including multiple
 modes of spawner arrivals. Despite its practical utility [@holt2008],
 the hierarchical arrival-exit process model has not been widely adopted
-to estimate spawner abundance.
+to estimate spawner abundance. For example, stock assessments of Osoyoos Lake Sockeye are still based on TAUC [@ogden2025] using residence time for Stuart Lake Sockeye estimated from Fofar Creek data in 1946 and 1952 [@killick1955], following the conclusion of Hilborn [@hilborn1999]: “for most data sets where measures of uncertainty are not required, the linear interpolation method is adequate.”
+
 
 This paper introduces further evolution of the arrival-exit approach
 [e.g., @hilborn1999; @su2001]. Our model differs from previous approaches by
@@ -515,43 +513,7 @@ versions of these parameters (summarized in Figure \ref{fig:fig-modcompare}A) an
 evaluated their fit to withheld data [Leave One Out, @vehtari2017], as
 described in section 2.1.1.
 
-The time-varying versions of these parameters were estimated using a
-hierarchical structure, where yearly values were drawn from a
-hyperdistribution (e.g.,
-$\mu^\text{arrival}_y \sim \text{Normal}(\mu^\text{arrival}_\mu, \mu^\text{arrival}_\sigma)$)
-defined by the multiyear mean and interannual standard deviation. We
-set a prior for the arrival day group mean as
-$\mu^\text{arrival}_\mu \sim \text{Normal}$(`r priors[2,2]`,
-`r priors[2,3]`), corresponding to
-`r format(as.Date(priors[2,2] + day_stand, origin = "2024-01-01"), "%B%e")`
-($\pm$ `r round(1.96*priors[2,3])` days), which is approximately
-`r round(priors[2,2]/max(sp_dat$day)*100)`% of the way through the
-typical spawning survey period. This reflects our expectation that peak
-arrivals occur during the early to mid portion of the survey window. We
-used the prior
-$\mu_\sigma^{\text{arrival}} \sim \text{Lognormal}$(log(`r priors[3,2]`), `r priors[3,3]`)
-to represent a moderate level of expected interannual variation in
-$\mu_y^{\text{arrival}}$. We modelled $\sigma^\text{arrival}_y$,
-$\mu_y^\text{exit lag}$ and $\sigma^\text{exit}_y$ using priors of the
-form $\text{Exponential}(\lambda)+1$ to ensure that parameters were
-strictly positive and bounded away from zero following the biological
-constraint that spawners vary in their arrival and exit timing, and that
-they remain on the spawning grounds for at least one day. For these
-spread and lag parameters, the hierarchical structure is applied on the
-log-transformed scale to improve sampling and ensure positivity. We set
-priors for $\sigma_\mu^\text{arrival}$ and $\sigma_\mu^\text{exit}$ as
-$\sim \text{Normal}$(`r priors[4,2]`, `r priors[4,3]`),
-corresponding to an expectation that arrival and exit timing should have
-similar spread. We set the prior for $\mu_\mu^\text{exit lag}$ as
-$\sim \text{Normal}(\log$(`r exp(priors[6,2])`), `r priors[6,3]`),
-aligning with the previously assumed residence time of approximately 11
-days, and with likely values ranging from
-`r round(exp(priors[6,2] - 1.96* priors[6,3])+1)` to
-`r round(exp(priors[6,2] + 1.96* priors[6,3])+1)` days. We used the same
-$\sim \text{Lognormal}$(log(`r priors[5,2]`), `r priors[5,3]`) prior for
-$\mu_\sigma^{\text{spread}}, \mu_\sigma^{\text{exit}}$, and
-$\mu_\sigma^{\text{exit lag}}$ to represent a moderate level of expected
-interannual variation in these parameters on the log-transformed scale.
+The time-varying versions of these parameters were estimated using a hierarchical structure, where yearly values were drawn from a hyperdistribution (e.g., $\mu^\text{arrival}_y \sim \text{Normal}(\mu^\text{arrival}, \sigma^\text{arrival})$) defined by the multiyear mean and interannual standard deviation. This hierarchical structure allows information to be shared across years, improving estimation in years with sparse data while capturing interannual variability. We set a prior for the mean arrival timing, $\mu^\text{arrival}$, corresponding to a date early in the survey period, reflecting our expectation that peak arrivals occur in the early to mid portion of the survey window. We set priors for the hyper-means of the transformed spread parameters that reflect an expectation that arrival and exit timing have similar spread. We specified a prior on $\sigma^\text{arrival}$ to represent a moderate level of interannual variation in arrival timing. We ensured that $\sigma^\text{arrival}_y$, $\mu_y^\text{exit lag}$ and $\sigma^\text{exit}_y$ were strictly positive and bounded away from zero by parameterizing them as $x = 1 + \exp(\theta_y)$, where $x$ denotes the parameter of interest and $\theta_y$ denotes the associated latent parameter. This is consistent with the biological constraint that spawners vary in their arrival and exit timing and remain on the spawning grounds for at least one day. The latent variables $\theta_y$, representing year-specific deviations, were then modelled either independently or within a multivariate normal structure (depending on the model used), such that $\theta_y = \log(x - 1)$, and $\theta_y$ follows the hierarchical structure described above. We specified an informative prior for $\mu^\text{exit lag}$ consistent with previously assumed residence times. We used similar priors for the interannual variation parameters of arrival spread, exit spread, and exit lag. Priors for all parameters and a summary of their roles are provided in Table \ref{tab:tbl-sim}.
 
 In the models where we use constant (not varying by year) versions of
 the timing parameters, we drop the subscript $y$ and denote them as:
@@ -578,7 +540,7 @@ in each year,
 and $\boldsymbol{\mu}$ is a vector of the timing parameter group level
 means,
 \begin{equation}
-\boldsymbol{\mu} = [\mu^\text{arrival}_\mu, \log(\sigma^\text{arrival}_\mu - 1), \log(\sigma^\text{exit}_\mu - 1), \log(\mu^\text{exit lag}_\mu - 1)].
+\boldsymbol{\mu} = [\mu^\text{arrival}, \log(\sigma^\text{arrival} - 1), \log(\sigma^\text{exit} - 1), \log(\mu^\text{exit lag} - 1)].
 \end{equation}
 
 The $\log(x - 1)$ transformation for the spread and lag parameters
@@ -1465,6 +1427,74 @@ This study was supported by a Collaborative Agreement between Fisheries and Ocea
 \appendix
 
 # Supplementary Materials {.appendix}
+
+```{r tbl-priors, echo = FALSE, warning=FALSE, message=FALSE}
+
+library(knitr)
+
+param_table <- data.frame(
+  Parameter = c(
+    "$N_y$", "$\\mu^\\text{arrival}_y$", "$\\sigma^\\text{arrival}_y$",
+    "$\\mu^\\text{exit lag}_y$", "$\\sigma^\\text{exit}_y$", "$\\phi$",
+    "$\\theta_y$", "$\\boldsymbol{\\Sigma}$",
+    "$\\mu^\\text{arrival}$", "$\\sigma^\\text{arrival}$",
+    "$\\mu^{\\text{arrival spread}}$", "$\\mu^{\\text{exit spread}}$", "$\\mu^{\\text{exit lag}}$",
+    "$\\sigma^{\\text{arrival spread}}$", "$\\sigma^{\\text{exit spread}}$", "$\\sigma^{\\text{exit lag}}$"
+  ),
+  Level = c(
+    rep("Year", 5), "Global",
+    "Year (latent)", "Hyper (MVN)",
+    rep("Hyper", 8)
+  ),
+  Description = c(
+    "Total spawner abundance",
+    "Mean arrival day",
+    "Arrival timing spread",
+    "Lag between arrival and exit",
+    "Exit timing spread",
+    "Negative binomial dispersion parameter",
+    "Latent parameter for transformed spread and lag",
+    "Covariance among timing parameters (MVN models only)",
+    "Mean arrival timing across years",
+    "Interannual SD in arrival timing",
+    "Mean (log-scale) arrival spread",
+    "Mean (log-scale) exit spread",
+    "Mean (log-scale) exit lag",
+    "Interannual SD of arrival spread",
+    "Interannual SD of exit spread",
+    "Interannual SD of exit lag"
+  ),
+  Prior = c(
+    sprintf("$\\log(N_y) \\sim \\text{Normal}(%.2f, %.2f)$", priors[1,2], priors[1,3]),
+    "$\\text{Normal}(\\mu^\\text{arrival}, \\sigma^\\text{arrival})$",
+    "$1 + \\exp(\\theta_y)$",
+    "$1 + \\exp(\\theta_y)$",
+    "$1 + \\exp(\\theta_y)$",
+    sprintf("$\\log(\\phi) \\sim \\text{Normal}(%.2f, %.2f)$", priors[7,2], priors[7,3]),
+    "$\\text{Normal or MVN}$",
+    "Estimated (LKJ prior on correlation)",
+    sprintf("$\\mu^\\text{arrival} \\sim \\text{Normal}(%.2f, %.2f)$", priors[2,2], priors[2,3]),
+    sprintf("$\\sigma^\\text{arrival} \\sim \\text{Lognormal}(\\log(%.2f), %.2f)$", priors[3,2], priors[3,3]),
+    sprintf("$\\mu^{\\text{arrival spread}} \\sim \\text{Normal}(%.2f, %.2f)$", priors[4,2], priors[4,3]),
+    sprintf("$\\mu^{\\text{exit spread}} \\sim \\text{Normal}(%.2f, %.2f)$", priors[4,2], priors[4,3]),
+    sprintf("$\\mu^{\\text{exit lag}} \\sim \\text{Normal}(\\log(%.2f), %.2f)$", priors[6,2], priors[6,3]),
+    sprintf("$\\sigma^{\\text{arrival spread}} \\sim \\text{Lognormal}(\\log(%.2f), %.2f)$", priors[5,2], priors[5,3]),
+    sprintf("$\\sigma^{\\text{exit spread}} \\sim \\text{Lognormal}(\\log(%.2f), %.2f)$", priors[5,2], priors[5,3]),
+    sprintf("$\\sigma^{\\text{exit lag}} \\sim \\text{Lognormal}(\\log(%.2f), %.2f)$", priors[5,2], priors[5,3])
+  )
+)
+
+kable(param_table, escape = FALSE,
+      caption = "Model parameters, roles, and prior distributions used across the set of candidate models. Not all parameters are present in every model variant, as described in the main text.",
+       booktabs = TRUE,
+  linesep = "",
+  longtable = TRUE
+) |>
+  kableExtra::kable_styling(latex_options = c("repeat_header", "hold_position")) |> 
+  column_spec(3, width = "6cm") %>%  # Description
+  column_spec(4, width = "5cm")
+
+```
 
 ```{=latex}
 \renewcommand{\thefigure}{S\arabic{figure}}
