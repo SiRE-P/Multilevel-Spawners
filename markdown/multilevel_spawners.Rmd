@@ -445,161 +445,86 @@ observation model:
 N_{y,d} \sim \text{NegBinomial}(\mu_{y,d}, \phi)
 \end{equation}
 
-where
-$N_{y,d}$ is the probability density distribution (PDD) for predicted
-counts, $\mu_{y,d}$ is the expected number of live spawners present in
-year $y$ on day $d$, and $\phi$ captures variability around $\mu_{y,d}$,
-including both observation error and natural variation that is not
-explicitly modelled. We assume that this expected number of spawners
-present, $\mu_{y,d}$, is a function of three unobserved (*i.e.*, latent)
-quantities that are estimated in our model: (1) $p^\text{arrived}_{y,d}$, the proportion of spawners that have arrived
-by day $d$; (2) $p^\text{exited}_{y,d}$, the proportion of spawners that
-have exited by day $d$, (*i.e.*, died or left the spawning grounds), and
-(3) $N_y$, the total spawner abundance in that year:
+where $N_{y,d}$ is the probability density distribution (PDD) for predicted counts, $\mu_{y,d}$ is the expected number of live spawners present in year $y$ on day $d$, and $\phi$ captures variability around $\mu_{y,d}$, including both observation error and natural variation that is not explicitly modelled. We assume that this expected number of spawners present, $\mu_{y,d}$, is a function of three unobserved (*i.e.*, latent) quantities that are estimated in our model: (1) $p^\text{arrived}_{y,d}$, the proportion of spawners that have arrived by day $d$; (2) $p^\text{exited}_{y,d}$, the proportion of spawners that have exited by day $d$, (*i.e.*, died or left the spawning grounds), and (3) $N_y$, the total spawner abundance in that year:
 
 \begin{equation}
 \mu_{y,d} \approx p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d}) \times N_y.
 \label{eq:eq-live}
 \end{equation}
 
-We assume that the spawners arrive over a range of days that follows a
-normal distribution, reside there for some days of spawning activity,
-and then die or leave the spawning grounds (other distributions for
-skewed or multimodal arrivals may be applicable). Thus, the proportion of
-spawners that have arrived by a given date $d$ in year $y$ follows a
-cumulative normal distribution:
+We assume that the spawners arrive over a range of days that follows a normal distribution, reside there for some days of spawning activity, and then die or leave the spawning grounds (other distributions for skewed or multimodal arrivals may be applicable). Thus, the proportion ofspawners that have arrived by a given date $d$ in year $y$ follows a cumulative normal distribution:
 
 \begin{equation}
-p^\text{arrived}_{y,d} = \Phi\left( \frac{ d - \mu^\text{arrival}_y }{ \sigma^\text{arrival}_y } \right).
+p^\text{arrived}_{y,d} = \Phi\left( \frac{ d - \mu^\text{arrival}_y }{ \sigma^\text{arrival}_y } \right),
 \end{equation}
 
-Likewise, the proportion of arrived spawners that have exited the live
-count by a given date $d$ in year $y$ follows a second cumulative normal
-distribution:
+where $\mu^\text{arrival}_y$ is the mean arrival date and $\sigma^\text{arrival}_y$ is the arrival timing spread.
+
+Likewise, the proportion of arrived spawners that have exited the live count by a given date $d$ in year $y$ follows a second cumulative normal distribution:
 \begin{equation}
 p^\text{exited}_{y,d} = \Phi\left( \frac{ d - (\mu^\text{arrival}_y + \mu^\text{exit lag}_y)}{\sigma^\text{exit}_y} \right),
 \label{eq:eq-exited}
 \end{equation}
 
-where $\mu^\text{exit lag}_y$ defines the number of days by which the
-mean exit date lags behind the mean arrival date $\mu^\text{arrival}_y$.
+where $\mu^\text{exit lag}_y$ defines the number of days by which the mean exit date lags behind the mean arrival date $\mu^\text{arrival}_y$, and $\sigma^\text{exit}_y$ is the exit timing spread.
 
-Total spawner abundance, $N_y$, in each year is a primary variable of
-interest and is estimated by the model as the scaling factor that links
-the estimated arrival and exit processes to the expected live spawners,
-$\mu_{y,d}$. We set a prior on spawner abundance as
-$log(N_y) \sim \text{Normal}$(`r priors[1,2]`, `r priors[1,3]`). This
-weakly informative prior is consistent with the range of log-transformed
-spawner abundances previously estimated for this population using
-trapezoidal AUC, but does not constrain estimates to match those values.
+Total spawner abundance, $N_y$, in each year is a primary variable of interest and is estimated by the model as the scaling factor that links the estimated arrival and exit processes to the expected live spawners, $\mu_{y,d}$. We set a prior on spawner abundance as $log(N_y) \sim \text{Normal}$(`r priors[1,2]`, `r priors[1,3]`). This weakly informative prior is consistent with the range of log-transformed spawner abundances previously estimated for this population using trapezoidal AUC, but does not constrain estimates to match those values.
 
-To prevent numerical instability when Equation \ref{eq:eq-live} approaches zero,
-we use a log-transformed approximation of the same form:
+To prevent numerical instability when values in Equation \ref{eq:eq-live} become very small, we use an equivalent expression on the log scale:
 
 \begin{equation}
-\mu_{y,d} =  \exp\left( \log\left(1 + 10^4 \times p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right) - \log(10^4) \right) \times N_y 
+\mu_{y,d} =  \exp\left( \log\left(1 + 10^4 \times p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right) - \log(10^4) \right) \times N_y.
 \end{equation}
 
-where the factor $10^4$ serves as a scaling factor that prevents changes
-in near-zero values from having an abrupt influence on $\mu_{y,d}$.
+This formulation is equivalent to Equation \ref{eq:eq-live}, with the addition of a small constant (1/10^4) to the proportion term. This adjustment ensures numerical stability when predicted values approach zero.
 
-In the equations above, we specified $\mu^\text{arrival}_y$,
-$\sigma^\text{arrival}_y$, $\mu_y^\text{exit lag}$, and
-$\sigma^\text{exit}_y$ using subscript $y$ to indicate that they vary
-from year to year. Some of these timing parameters may not need to vary
-annually in a model applied to a specific situation, so we compared a
-series of models with different combinations of varying and constant
-versions of these parameters (summarized in Figure \ref{fig:fig-modcompare}A) and
-evaluated their fit to withheld data [Leave One Out, @vehtari2017], as
-described in section 2.1.1.
+In the equations above, we specified $\mu^\text{arrival}_y$, $\sigma^\text{arrival}_y$, $\mu_y^\text{exit lag}$, and $\sigma^\text{exit}_y$ using subscript $y$ to indicate that they vary from year to year. Some of these timing parameters may not need to vary annually in a model applied to a specific situation, so we compared a series of models with different combinations of varying and constant versions of these parameters (summarized in Figure \ref{fig:fig-modcompare}A) and evaluated their fit to withheld data [Leave One Out, @vehtari2017], as described in section 2.1.1.
 
 The time-varying versions of these parameters were estimated using a hierarchical structure, where yearly values were drawn from a hyperdistribution (e.g., $\mu^\text{arrival}_y \sim \text{Normal}(\mu^\text{arrival}, \sigma^\text{arrival})$) defined by the multiyear mean and interannual standard deviation. This hierarchical structure allows information to be shared across years, improving estimation in years with sparse data while capturing interannual variability. We set a prior for the mean arrival timing, $\mu^\text{arrival}$, corresponding to a date early in the survey period, reflecting our expectation that peak arrivals occur in the early to mid portion of the survey window. We set priors for the hyper-means of the transformed spread parameters that reflect an expectation that arrival and exit timing have similar spread. We specified a prior on $\sigma^\text{arrival}$ to represent a moderate level of interannual variation in arrival timing. We ensured that $\sigma^\text{arrival}_y$, $\mu_y^\text{exit lag}$ and $\sigma^\text{exit}_y$ were strictly positive and bounded away from zero by parameterizing them as $x = 1 + \exp(\theta_y)$, where $x$ denotes the parameter of interest and $\theta_y$ denotes the associated latent parameter. This is consistent with the biological constraint that spawners vary in their arrival and exit timing and remain on the spawning grounds for at least one day. The latent variables $\theta_y$, representing year-specific deviations, were then modelled either independently or within a multivariate normal structure (depending on the model used), such that $\theta_y = \log(x - 1)$, and $\theta_y$ follows the hierarchical structure described above. We specified an informative prior for $\mu^\text{exit lag}$ consistent with previously assumed residence times. We used similar priors for the interannual variation parameters of arrival spread, exit spread, and exit lag. Priors for all parameters and a summary of their roles are provided in Table \ref{tab:tbl-sim}.
 
-In the models where we use constant (not varying by year) versions of
-the timing parameters, we drop the subscript $y$ and denote them as:
-$\mu^\text{arrival}$, $\sigma^\text{arrival}$, $\mu^\text{exit lag}$,
-and $\sigma^\text{exit}$. In these cases, we use the prior for the group
-level $\mu$ and omit the group-level variance parameter, thus removing
-the hierarchical structure.
+In the models where we use constant (not varying by year) versions of the timing parameters, we drop the subscript $y$ and denote them as: $\mu^\text{arrival}$, $\sigma^\text{arrival}$, $\mu^\text{exit lag}$, and $\sigma^\text{exit}$. In these cases, we use the prior for the group level $\mu$ and omit the group-level variance parameter, thus removing the hierarchical structure.
 
-In the model where all timing parameters have interannual variation, we
-compare a version where they are estimated independently to a model
-where they are jointly estimated using a multivariate normal
-distribution (MVN). We specify this joint estimation as:
+In the model where all timing parameters have interannual variation, we compare a version where they are estimated independently to a model where they are jointly estimated using a multivariate normal distribution (MVN). We specify this joint estimation as:
 \begin{equation}
 \boldsymbol{\theta_y} \sim \text{MVN}(\boldsymbol{\mu}, \boldsymbol{\Sigma}),
 \end{equation}
 
-where $\boldsymbol{\theta_y}$ is a vector of the four timing parameters
-in each year,
+where $\boldsymbol{\theta_y}$ is a vector of the four timing parameters in each year,
 
 \begin{equation}
 \boldsymbol{\theta_y} = [\mu^\text{arrival}_y, \log(\sigma^\text{arrival}_y - 1), \log(\sigma^\text{exit}_y - 1), \log(\mu^\text{exit lag}_y - 1)],
 \end{equation}
 
-and $\boldsymbol{\mu}$ is a vector of the timing parameter group level
-means,
+and $\boldsymbol{\mu}$ is a vector of the timing parameter group level means,
 \begin{equation}
 \boldsymbol{\mu} = [\mu^\text{arrival}, \log(\sigma^\text{arrival} - 1), \log(\sigma^\text{exit} - 1), \log(\mu^\text{exit lag} - 1)].
 \end{equation}
 
-The $\log(x - 1)$ transformation for the spread and lag parameters
-ensures that they remain positive and bounded away from zero, while also
-improving sampling stability, as described above. The parameter
-$\boldsymbol{\Sigma}$ is the residual covariance matrix, which describes
-both the amount of interannual variation in each timing parameter and the
-correlation among them. This structure jointly estimates the timing
-processes, allowing the model to capture interdependence between them, for example, if the exit lag is longer in years when arrival timing is earlier.
+The $\log(x - 1)$ transformation for the spread and lag parameters ensures that they remain positive and bounded away from zero, while also improving sampling stability, as described above. The parameter $\boldsymbol{\Sigma}$ is the residual covariance matrix, which describes both the amount of interannual variation in each timing parameter and the correlation among them. This structure jointly estimates the timing processes, allowing the model to capture interdependence between them, for example, if the exit lag is longer in years when arrival timing is earlier.
 
 Chains were initialized with random draws from biologically plausible ranges for timing, abundance, and overdispersion parameters (Table \ref{tab:tbl-init}). This was necessary because Stan's default initialization often led to poor convergence, with chains exploring different regions of the parameter space. Using biologically plausible initialization improved adaptation and ensured all chains converged to the same posterior distribution.
 
-We used ChatGPT (model 4o) as a tool to support Stan model development,
-including brainstorming model structure and identifying causes of
-convergence issues. ChatGPT was not used to generate Stan code directly,
-and all suggestions were reviewed and verified by the authors for logic
-and accuracy.
+We used ChatGPT (model 4o) as a tool to support Stan model development, including brainstorming model structure and identifying causes of convergence issues. ChatGPT was not used to generate Stan code directly, and all suggestions were reviewed and verified by the authors for logic and accuracy.
 
 ### Diagnostics
 
-An essential concept in Bayesian statistics is that the data are known
-but the best model for those data is unknown [@mcelreath2020] and are always
-a vast simplification of reality [@jaynes2003]. Metrics to compare and
-rank competing models are required. In ecological systems, a
-superabundance of habitat indicators as covariates means over-fitting is
-a problem. Leave-one-out (LOO) statistics, where each point is predicted
-while omitted from fitting (cross-validation), provide diagnostics to evaluate predictive power and
-over-fitting. We used the sum of *expected log predictive probability
-density* (ELPD) for each of $n$ omitted observations' predictions, and
-$\mathrm{ELPD}_{SE}=\text{sd}(\mathrm{ELPD})/\sqrt{n}$, the standard
-error of those probabilities [@vehtari2017].
+An essential concept in Bayesian statistics is that the data are known but the best model for those data is unknown [@mcelreath2020] and are always a vast simplification of reality [@jaynes2003]. Metrics to compare and rank competing models are required. In ecological systems, a superabundance of habitat indicators as covariates means over-fitting is a problem. Leave-one-out (LOO) statistics, where each point is predicted while omitted from fitting (cross-validation), provide diagnostics to evaluate predictive power and over-fitting. We used the sum of *expected log predictive probability density* (ELPD) for each of $n$ omitted observations' predictions, and $\mathrm{ELPD}_{SE}=\text{sd}(\mathrm{ELPD})/\sqrt{n}$, the standard error of those probabilities [@vehtari2017].
 
 ### Effective residence time
 
-Although $\mu^\text{exit lag}_y$ defines the average delay between
-arrival and exit distributions, it does not equal the residence time
-used by TAUC. This is because the residence time of individual spawners
-depends on the interactions of arrival and exit processes; it is not
-directly estimated by a single parameter of the model. Importantly,
-whenever $\sigma^\text{arrival}_y \neq \sigma^\text{exit}_y$, individual
-residence time cannot be the same for all spawners, and instead varies
-depending on when each spawner arrives. We can, however, calculate an
-*effective residence time* in each year based on the sum of the estimated
-number of live spawners across all days in the spawning period, $D$,
-divided by the estimated total spawner abundance:
+Although $\mu^\text{exit lag}_y$ defines the average delay between arrival and exit distributions, it does not equal the residence time used by TAUC. This is because the residence time of individual spawners depends on the interactions of arrival and exit processes; it is not directly estimated by a single parameter of the model. Importantly, whenever $\sigma^\text{arrival}_y \neq \sigma^\text{exit}_y$, individual residence time cannot be the same for all spawners, and instead varies depending on when each spawner arrives. Although this variation arises from the interaction of the population-level arrival and exit processes, in contrast to @su2001, our formulation does not explicitly parameterize how residence time depends on individual arrival date. We can, however, calculate an *effective residence time* in each year based on the sum of the estimated number of live spawners across all days in the spawning period, $D$, divided by the estimated total spawner abundance:
 
 \begin{equation}
 \mu^{\text{residence}}_y = \frac{\sum_{d = 1}^D \left(p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d}) \times N_y^{\text{spawners}}\right)}{N_y^{\text{spawners}}}.
 \label{eq:eq-residence}
 \end{equation}
 
-This is the equivalent of back-calculating residence time from the area
-under the curve, which is possible because we have directly estimated
-$N_y^{\text{spawners}}$. However, because $N_y^{\text{spawners}}$
-appears in both the numerator and the denominator of Equation \ref{eq:eq-residence}, we
-can simplify this equation as:
+This is the equivalent of back-calculating residence time from the area under the curve, which is possible because we have directly estimated $N_y^{\text{spawners}}$. However, because $N_y^{\text{spawners}}$ appears in both the numerator and the denominator of Equation \ref{eq:eq-residence}, we can simplify this equation as:
 \begin{equation}
 \mu^{\text{residence}}_y = \sum_{d = 1}^D \left(p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right).
 \end{equation}
+
+
 
 
 ## Simulations
@@ -622,10 +547,6 @@ samp_accuracy            <-   0.15 # rnorm(n, 1, 0.15)
 # 15% sampling error, +/- 95% = 0.3 is a lot. Likely under not over. 
 gaps                     <- c(1,3,5,7) # days between surveys. survey_gaps identifies scenarios.
 
-sim_params <- data.frame(parameter = c("log run", "arrival", "arrival spread", "exit lag", "exit spread"),
-                         mu = c(log_run_mu, arrival_timing_mu, arrival_spread_mu, exit_lag_mu, exit_spread_mu),
-                         sigma = c(log_run_sigma, arrival_timing_sigma, arrival_spread_sigma, exit_lag_sigma, exit_spread_sigma),
-                         distribution = c("Normal"))
 
 if(!file.exists("../data/simulations.RData")){
   m <- stan_model("../stan/spawners_m8.stan")
@@ -782,26 +703,7 @@ if(!file.exists("../data/simulations.RData")){
 }
 ```
 
-To quantify how reliably the statistical model can estimate the annual
-values for run size and the four timing parameters, we challenged our
-model with simulated data. The simulations were generated using the same
-parameters as the statistical model. Each simulation consisted of 20
-years of observations, where the annual parameter values governing the
-spawning timing and run size were drawn randomly from the distributions
-in Table \ref{tab:tbl-sim}. These yearly parameters are considered to be the *true*
-values to which we compare the estimated values from the statistical
-model. Daily time series for the presence of spawners each day, 
-predicted from those *true* values in the model, were modified by
-multiplicative normal sampling error (15% precision) to generate
-*observed* data. To test the sensitivity of our model to different
-sampling frequencies, we contrasted results when we subsampled these
-time series with 1, 3, 5 and 7 day gaps. We then ran 20 replicate
-simulations to ensure that our results were representative. We fit these
-observed data with statistical model 8 (Figure \ref{fig:fig-modcompare}), which is the
-same as our selected model 9 but without the multivariate correlation
-structure between parameters. Because our goal was to test recovery of
-known values rather than parameter correlations, we did not include this
-additional complexity in our simulations.
+To quantify how reliably the statistical model can estimate the annual values for run size and the four timing parameters, we challenged our model with simulated data. The simulations were generated using the same parameters as the statistical model. Each simulation consisted of 20 years of observations, where the annual parameter values governing the spawning timing and run size were drawn randomly from the distributions in Table \ref{tab:tbl-sim}. These yearly parameters are considered to be the *true* values to which we compare the estimated values from the statistical model. Daily time series for the presence of spawners each day,  predicted from those *true* values in the model, were modified by multiplicative normal sampling error (15% precision) to generate *observed* data. To test the sensitivity of our model to different sampling frequencies, we contrasted results when we subsampled these time series with 1, 3, 5 and 7 day gaps. We then ran 20 replicate simulations to ensure that our results were representative. We fit these observed data with statistical model 8 (Figure \ref{fig:fig-modcompare}), which is the same as our selected model 9 but without the multivariate correlation structure between parameters. Because our goal was to test recovery of known values rather than parameter correlations, we did not include this additional complexity in our simulations.
 
 We quantified coverage as the proportion of simulations in which the true value fell within the 95% posterior credible interval. We quantified precision as the median absolute deviation (MAD, a robust version of standard deviation) of the posterior draws around the median, and quantified bias as the median of ratios of fitted over true values. 
 
@@ -888,12 +790,79 @@ infrequent removal, which is not easily accounted for in a model.
 
 ## Model selection and convergence
 
-Based on ELPD statistics (Figure \ref{fig:fig-modcompare}B) we selected model 9 as the
-best among those explored. This model was the most complex of those
-considered and it included annual variation in spawner abundance,
-arrival timing, arrival spread, exit spread, and exit lag with a
-multivariate normal (MVN) structure in the annual variation of the four
-timing parameters.
+Based on ELPD statistics (Figure \ref{fig:fig-modcompare}B) we selected model 9 as the best among those explored. This model was the most structurally complex of those considered and it included annual variation in spawner abundance, arrival timing, arrival spread, exit spread, and exit lag with a multivariate normal (MVN) structure in the annual variation of the four timing parameters.
+
+```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= 'center', fig.cap= "Model summary and comparison. Panel A shows which parameters or model structure that were held constant or not included (white) versus those that varied or were included (black) in each of the candidate models (rows). Panel B shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. Panel C shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors. Note, that the x-axis in panel B is pseudo log transformed (inverse hyperbolic sine) to highlight differences among the best performing models."}
+
+signed_log10_trans <- trans_new(
+  name = "signed_log10",
+  transform = function(x) sign(x) * log10(abs(x)),
+  inverse = function(x) sign(x) * 10^abs(x)
+)
+
+data.frame(model = 1:9,
+           arrival = c("constant/not included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included"), 
+           arrival_spread = c("constant/not included", "constant/not included","varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included", "varies/included"), 
+           exit_spread = c("constant/not included", "constant/not included", "constant/not included", "varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included"),
+           residence = c("constant/not included", "constant/not included", "constant/not included", "constant/not included", "varies/included", "varies/included", "constant/not included", "varies/included", "varies/included"),
+           MVN = c(rep("constant/not included", 8), "varies/included")) %>%
+  gather(key = parameter, value = value, -model) %>% 
+  mutate(parameter = factor(parameter, levels = c("arrival", "arrival_spread", "exit_spread", "residence", "MVN"))) |> 
+  ggplot(aes(x = parameter, y = model, fill = value))+
+  geom_tile(color = "grey")+
+  scale_fill_manual(values = c("NA", "black"), "")+
+  scale_y_reverse(breaks = 1:9)+
+  theme(legend.position = "bottom")+
+  coord_cartesian(expand = FALSE)+
+  theme(panel.grid = element_blank(),
+        axis.ticks = element_blank())+
+  labs(x = "Parameter or model structure", y = "Model")+
+  scale_x_discrete(
+    labels = c(
+      "arrival" = expression(mu[y]^arrival),
+      "arrival_spread" = expression(sigma[y]^arrival),
+      "exit_spread" = expression(sigma[y]^exit),
+      "residence" = expression(mu[y]^"exit lag"),
+      "AR" = "AR"
+    )
+  )+
+  theme_bw()+
+  theme(panel.grid = element_blank(), legend.position = "bottom")+
+  
+  
+  ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
+  geom_hline(yintercept = 0, linetype = 2)+
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = dloo - se, ymax = dloo + se), width = 0) +
+  coord_flip() +
+  scale_y_continuous(trans = pseudolog10_trans, breaks = c(-100, -10, -1))+
+  scale_x_reverse(breaks = 1:9)+
+  labs(
+    x = "",
+    y = expression(Delta*ELPD~"(rel. to best)")
+  )+
+  theme(panel.grid.minor.x = element_blank())+
+  scale_color_manual(values = c(1, "red"), guide = "none")+
+  theme_bw()+
+  
+  ggplot(loo_df, aes(x = model, y = p_loo, color = dloo==0)) +
+  geom_point(size = 2) +
+  geom_errorbar(aes(ymin = p_loo - se_p_loo, ymax = p_loo  + se_p_loo), width = 0) +
+  coord_flip() +
+  scale_x_reverse(breaks = 1:9)+
+  labs(
+    x = "",
+    y = expression("effective parameters (" * p[loo] * ")")
+  )+
+  scale_color_manual(values = c(1, "red"), guide = "none")+
+  theme_bw()+
+  theme(panel.grid.minor.x = element_blank())+
+  
+  
+  plot_annotation(tag_levels = "A")+
+  plot_layout(widths = c(1, 0.5, 0.5))
+```
+
 
 The effective number of parameters ($\mathrm{p}_{\mathrm{loo}}$)
 increased when arrival timing variation was introduced (model 1 *vs.*
@@ -913,7 +882,7 @@ parameters had effective sample sizes $>400$ (min =
 We find that the model is able to estimate the parameters used to
 generate our simulated data. Regardless of the gap between surveys, the true value of all parameters falls within the 95% credible interval in at least 95% of annual estimates (Figure \ref{fig:fig-sims}A). We find that estimates become less precise as the survey gap increases (Figure \ref{fig:fig-sims}B), particularly for exit lag and arrival timing. The model tends to overestimate exit lag (Figure \ref{fig:fig-sims}B), but this is not consistent across years or simulations. Otherwise, our estimates of bias suggest that there is no tendency for any of the other parameters to be over- or underestimated.
 
-```{r fig-sims, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 9, fig.align= 'center', fig.cap= "Credible interval (95%) coverage (A), median absolute deviation (B), bias (C) for each parameter for simulated data as a function of increasing survey gap (days). All measures compare modelled estimates with true values used to generate the simulations. In panel A, values represent the percent of annual estimates falling within the 95% credible interval, pooled across 20 replicate simulations. In panels B and C, summaries are computed across annual estimates, pooled over 20 replicate simulations, each spanning 20 years. In panels B and C, points show medians and intervals show the 66% and 95% distributions."}
+```{r fig-sims, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 9, fig.align= 'center', fig.cap= "Credible interval (95%) coverage (A), median absolute deviation (B), bias (C) for each parameter for simulated data as a function of increasing survey gap (days). All measures compare modelled estimates with true values used to generate the simulations. In panel A, values represent the percent of annual estimates falling within the 95% credible interval, pooled across 20 replicate simulations. In panels B and C, summaries are computed across annual estimates, pooled over 20 replicate simulations, each spanning 20 years. In panels B and C, points show medians and intervals show the 66% and 95% distributions. Results are based on model 8, which does not include the MVN structure."}
 
  ggplot(sim_summary |> group_by(gap, .variable) |> summarise(in_95_perc = mean(in_95)*100) , aes(x = gap, y = in_95_perc, color = .variable))+
   geom_hline(yintercept = 100, lty = 2)+
@@ -1412,8 +1381,7 @@ Alliance. Please contact them directly concerning availability and
 acknowledgements: [Sylix.org](sylix.org).
 
 All scripts and stan model code are available for public access on
-[GitHub](https://github.com/SiRE-P/Multilevel-Spawners) and
-[Zenodo](https://doi.org/10.5281/zenodo.18395418).
+ GitHub (https://github.com/SiRE-P/Multilevel-Spawners) and Zenodo (https://doi.org/10.5281/zenodo.18395418).
 
 ## Funding statement
 This study was supported by a Collaborative Agreement between Fisheries and Oceans Canada and the Okanagan Nation Alliance, with funding provided by the Douglas County Public Utility District, WA, USA.
@@ -1427,6 +1395,12 @@ This study was supported by a Collaborative Agreement between Fisheries and Ocea
 \appendix
 
 # Supplementary Materials {.appendix}
+```{=latex}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+```
 
 ```{r tbl-priors, echo = FALSE, warning=FALSE, message=FALSE}
 
@@ -1491,22 +1465,56 @@ kable(param_table, escape = FALSE,
   longtable = TRUE
 ) |>
   kableExtra::kable_styling(latex_options = c("repeat_header", "hold_position")) |> 
-  column_spec(3, width = "6cm") %>%  # Description
-  column_spec(4, width = "5cm")
+  column_spec(3, width = "5cm") %>%  # Description
+  column_spec(4, width = "6.2cm")
 
 ```
 
-```{=latex}
-\renewcommand{\thefigure}{S\arabic{figure}}
-\renewcommand{\thetable}{S\arabic{table}}
-\setcounter{figure}{0}
-\setcounter{table}{0}
-```
+
 
 ```{r tbl-sim, echo=FALSE, warning=FALSE, message=FALSE}
+sim_params <- data.frame(
+  parameter = c(
+    "$\\log(N_y)$",
+    "$\\mu^\\text{arrival}_y$",
+    "$\\sigma^\\text{arrival}_y$",
+    "$\\mu^\\text{exit lag}_y$",
+    "$\\sigma^\\text{exit}_y$"
+  ),
+  mu = c(
+    log_run_mu,
+    arrival_timing_mu,
+    arrival_spread_mu,
+    exit_lag_mu,
+    exit_spread_mu
+  ),
+  sigma = c(
+    log_run_sigma,
+    arrival_timing_sigma,
+    arrival_spread_sigma,
+    exit_lag_sigma,
+    exit_spread_sigma
+  ),
+  distribution = c(
+    "Normal",
+    "Normal",
+    "Normal",
+    "Normal",
+    "Normal"
+  )
+)
+
+colnames(sim_params) <- c(
+  "Parameter",
+  "$\\mu$",
+  "$\\sigma$",
+  "Distribution"
+)
+
+
 knitr::kable(
-  sim_params,
-  caption   = "Simulation parameters used in the study.",
+  sim_params, escape = FALSE,
+  caption   = "Simulation parameters used to generate synthetic datasets. For each parameter, yearly values were drawn from the specified normal distribution with mean and standard deviation.",
   booktabs = TRUE,
   linesep = "",
   longtable = TRUE
@@ -1516,91 +1524,38 @@ knitr::kable(
 
 
 ```{r tbl-init, echo=FALSE, warning=FALSE, message=FALSE}
-init.df <- data.frame(parameter = c("log_run", "arrival_mu", "arrival_sigma", "arrival_spread_mu", "exit_spread_mu", "exit_lag_mu", "phi"), 
-           dist = c("Normal", "Normal", "Lognormal", "Normal", "Normal", "Normal", "Lognormal"),
-           mu = c(10, 40, "log(1)", 2, 2.5, 2.5, "log(50)"),
-           sigma = c(0.5, 2, 0.2, 0.2, 0.2, 0.2, 0.1))
+init.df <- data.frame(
+  parameter = c(
+    "$\\log(N_y)$",
+    "$\\mu^\\text{arrival}$",
+    "$\\sigma^\\text{arrival}$",
+    "$\\mu^{\\text{arrival spread}}$",
+    "$\\mu^{\\text{exit spread}}$",
+    "$\\mu^{\\text{exit lag}}$",
+    "$\\phi$"
+  ),
+  mu = c(10, 40, "log(1)", 2, 2.5, 2.5, "log(50)"),
+  sigma = c(0.5, 2, 0.2, 0.2, 0.2, 0.2, 0.1),
+  dist = c("Normal", "Normal", "Lognormal", "Normal", "Normal", "Normal", "Lognormal")
+)
+
+colnames(init.df) <- c(
+  "Parameter",
+  "$\\mu$",
+  "$\\sigma$",
+  "Distribution"
+)
 
 knitr::kable(
-  init.df,
-  caption   = "Initialization settings for the stan models. In models where parameters lack hierarchical structure, the same prior for the parameter specified for mu in this table was used for the corresponding parameter. All other parameters used Stan's default initialization (random values between -2 and 2, unless constrained).",
+  init.df , escape = FALSE,
+  caption = "Initialization settings for the Stan models. In models where parameters lack hierarchical structure, the same prior specified for the corresponding parameter was used. All other parameters used Stan's default initialization (random draws between -2 and 2).",
   booktabs = TRUE,
   linesep = "",
   longtable = TRUE
-) |>
+) %>%
   kableExtra::kable_styling(latex_options = "repeat_header")
 ```
 
-```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= 'center', fig.cap= "Model summary and comparison. Panel A shows which parameters or model structure that were held constant or not included (white) versus those that varied or were included (black) in each of the candidate models (rows). Panel B shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. Panel C shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors. Note, that the x-axis in panel B is pseudo log transformed (inverse hyperbolic sine) to highlight differences among the best performing models."}
-
-signed_log10_trans <- trans_new(
-  name = "signed_log10",
-  transform = function(x) sign(x) * log10(abs(x)),
-  inverse = function(x) sign(x) * 10^abs(x)
-)
-
-data.frame(model = 1:9,
-           arrival = c("constant/not included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included", "varies/included"), 
-           arrival_spread = c("constant/not included", "constant/not included","varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included", "varies/included"), 
-           exit_spread = c("constant/not included", "constant/not included", "constant/not included", "varies/included", "constant/not included", "constant/not included", "varies/included", "varies/included", "varies/included"),
-           residence = c("constant/not included", "constant/not included", "constant/not included", "constant/not included", "varies/included", "varies/included", "constant/not included", "varies/included", "varies/included"),
-           MVN = c(rep("constant/not included", 8), "varies/included")) %>%
-  gather(key = parameter, value = value, -model) %>% 
-  mutate(parameter = factor(parameter, levels = c("arrival", "arrival_spread", "exit_spread", "residence", "MVN"))) |> 
-  ggplot(aes(x = parameter, y = model, fill = value))+
-  geom_tile(color = "grey")+
-  scale_fill_manual(values = c("NA", "black"), "")+
-  scale_y_reverse(breaks = 1:9)+
-  theme(legend.position = "bottom")+
-  coord_cartesian(expand = FALSE)+
-  theme(panel.grid = element_blank(),
-        axis.ticks = element_blank())+
-  labs(x = "Parameter or model structure", y = "Model")+
-  scale_x_discrete(
-    labels = c(
-      "arrival" = expression(mu[y]^arrival),
-      "arrival_spread" = expression(sigma[y]^arrival),
-      "exit_spread" = expression(sigma[y]^exit),
-      "residence" = expression(mu[y]^"exit lag"),
-      "AR" = "AR"
-    )
-  )+
-  theme_bw()+
-  theme(panel.grid = element_blank(), legend.position = "bottom")+
-  
-  
-  ggplot(loo_df, aes(x = model, y = dloo, color = dloo==0)) +
-  geom_hline(yintercept = 0, linetype = 2)+
-  geom_point(size = 2) +
-  geom_errorbar(aes(ymin = dloo - se, ymax = dloo + se), width = 0) +
-  coord_flip() +
-  scale_y_continuous(trans = pseudolog10_trans, breaks = c(-100, -10, -1))+
-  scale_x_reverse(breaks = 1:9)+
-  labs(
-    x = "",
-    y = expression(Delta*ELPD~"(rel. to best)")
-  )+
-  theme(panel.grid.minor.x = element_blank())+
-  scale_color_manual(values = c(1, "red"), guide = "none")+
-  theme_bw()+
-  
-  ggplot(loo_df, aes(x = model, y = p_loo, color = dloo==0)) +
-  geom_point(size = 2) +
-  geom_errorbar(aes(ymin = p_loo - se_p_loo, ymax = p_loo  + se_p_loo), width = 0) +
-  coord_flip() +
-  scale_x_reverse(breaks = 1:9)+
-  labs(
-    x = "",
-    y = expression("effective parameters (" * p[loo] * ")")
-  )+
-  scale_color_manual(values = c(1, "red"), guide = "none")+
-  theme_bw()+
-  theme(panel.grid.minor.x = element_blank())+
-  
-  
-  plot_annotation(tag_levels = "A")+
-  plot_layout(widths = c(1, 0.5, 0.5))
-```
 
 ```{r fig-map, echo = FALSE, warning=FALSE, message=FALSE, fig.cap = "The spawning grounds for Sockeye Salmon population that rear as fry in the North Basin of Osoyoos Lake are 20 to 30 km upstream of the lake, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. River flows that affect spawners, eggs, and fry are monitored by Environment Canada (station 08NM085, also called station 08NM0001). Map produced by Margot Stockwell, Fisheries and Oceans Canada.", out.width="5in"}
 
@@ -1662,7 +1617,7 @@ spread_draws(fit, live_mu[obs]) %>%
   plot_annotation(tag_levels = "A")
 ```
 
-```{r fig-cor, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Estimated pariwise correlations between the four timing parameters. The colour shows the posterior median value; numbers indicate the proportion of the posterior with the same sign.", fig.align='center', fig.height=4, fig.width=5}
+```{r fig-cor, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Estimated pairwise correlations between the four timing parameters. Colour shows the posterior median correlation. Numbers indicate the proportion of posterior samples with the same sign (i.e., the posterior probability of a positive or negative association), rather than correlation coefficients.", fig.align='center', fig.height=4, fig.width=5}
 
 param_labels <- c(
   "1" = expression(mu[y]^arrival),
