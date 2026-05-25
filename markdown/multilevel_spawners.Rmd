@@ -308,41 +308,14 @@ address some of the limitations of the TAUC and GAUC approaches. As
 initially developed for salmon by @quinn1997, the number of spawners
 present during a survey is the number of arrivals cumulative to a survey date, minus
 exits cumulative to that date (Figure \ref{fig:fig-enterexit}). Average residence time was then an estimated parameter rather than an assumption. In the subsequent model by @hilborn1999, arrivals and exits
-were assumed to follow the same cumulative distribution. @su2001 and
-@adkison2001 extended this framework to make residence time a declining
-function of arrival date. They also allowed for interannual variation
-in the timing parameters, estimated for all years simultaneously in
-hierarchical regression to improve estimates in years with sparse data.
-Further variations were explored by @labelle2021, including multiple
-modes of spawner arrivals. Despite its practical utility [@holt2008],
-the hierarchical arrival-exit process model has not been widely adopted
-to estimate spawner abundance. For example, stock assessments of Osoyoos Lake Sockeye are still based on TAUC [@ogden2025] using residence time for Stuart Lake Sockeye estimated from Fofar Creek data in 1946 and 1952 [@killick1955], following the conclusion of Hilborn [@hilborn1999]: “for most data sets where measures of uncertainty are not required, the linear interpolation method is adequate.”
+were assumed to follow the same cumulative distribution. @su2001 and @adkison2001 extended this framework to make residence time a declining function of arrival date. They also allowed for interannual variation in the timing parameters, estimated for all years simultaneously in hierarchical regression to improve estimates in years with sparse data. Further variations were explored by @labelle2021, including multiple modes of spawner arrivals. Despite the practical utility of the hierarchical arrival-exit process model [@holt2008], it has not been widely adopted and TAUC is still commonly used [e.g., @atlas2021; @sounhein2022; @gleason2025; @ogden2025; @brown2026].
 
 
-This paper introduces further evolution of the arrival-exit approach
-[e.g., @hilborn1999; @su2001]. Our model differs from previous approaches by
-estimating four timing parameters: (1) arrival timing, the average
-day of spawner arrivals; (2) arrival spread, the variation (as
-standard deviation, assuming normal distribution) in spawner arrival dates; (3)
-exit lag, the difference between mean arrival date and mean exit
-date; and (4) exit spread: the variation in exit timing
-(Figure \ref{fig:fig-enterexit}). This avoids imposing a specific function relating
-arrival date and residence time, as in @su2001. As a further
-improvement, we model the timing parameters as a multivariate normal
-distribution (MVN) with an estimated covariance structure. This
-recognizes the likelihood of correlations among timing parameters, by
-quantifying and applying these. We use a hierarchical Bayesian
-framework, enabling estimation of interannual variation in both spawner
-timing and abundance. This hierarchical structure shares information
-across years, improving estimates when data are sparse while reducing
-the risk of over-fitting.
 
-We first demonstrate the performance of the model by showing how it can
-accurately recover spawner timing and abundance parameters from
-simulated data. Then we apply it to 25 years of visual spawner
-enumeration surveys in the Okanagan River, to demonstrate its utility
-for ecological inference and for management-relevant estimation of
-spawner abundance.
+
+This paper introduces further evolution of the arrival-exit approach [e.g., @hilborn1999; @su2001]. Both approaches have three common parameters: (1) arrival timing, defined as the mean day of spawner arrivals; (2) arrival spread, the standard deviation of arrival dates; and (3) exit lag, the difference between mean arrival date and mean exit date. The key distinction lies in how the exit process is modelled. Su et al. (2001) modelled residence time as a declining function of arrival date such that earlier-arriving individuals remain longer on the spawning grounds, using a fixed functional form with parameters derived from an external study. In contrast, our model estimates a separate exit timing distribution with its own mean and spread, rather than specifying residence time as a function of arrival date (Figure \ref{fig:fig-enterexit}). This allows the exit process to vary flexibly among years and captures variation in residence time without imposing a fixed or explicitly arrival-dependent relationship. As a further improvement, we model the timing parameters as a multivariate normal distribution (MVN) with an estimated covariance structure. This allows for correlation among timing parameters by estimating their covariance structure. We use a hierarchical Bayesian framework, enabling estimation of interannual variation in both spawner timing and abundance. This hierarchical structure shares information across years, improving estimates when data are sparse while reducing the risk of over-fitting.
+
+We first demonstrate the performance of the model by showing how it can accurately recover spawner timing and abundance parameters from simulated data. Then we apply it to 25 years of visual spawner enumeration surveys in the Okanagan River, to demonstrate its utility for ecological inference and for management-relevant estimation of spawner abundance.
 
 ```{r fig-enterexit, echo=FALSE, warning=FALSE, message=FALSE, fig.height = 4, fig.width = 6, fig.align= 'center', fig.cap = "Example of how the model estimates total spawner abundance, arrival timing, arrival spread, exit lag, and exit spread based on the observed counts (points) of spawners on multiple days. The number of spawners present on a given day is the difference between accumulated arrivals and accumulated exits. We assumed spawner counts are imperfect observations of the true number (sampling error), so individual points differ from the estimated presence. The total abundance of spawners is estimated as the total number that arrived across all dates. All model parameters are estimated with uncertainty – lines show the posterior median, bands show the 95% credible intervals. For the arrival and exit curves, uncertainty grows as abundance increases. This is because uncertainty in the timing of arrivals and exits combines with the uncertainty in the overall abundance estimates."}
 j <- 24 # used 2024 as example
@@ -383,8 +356,8 @@ counts <- sapply(day_seq, FUN = function(x) {
 
 example_data <- bind_rows(arrived, exited, counts) %>% 
   group_by(type, day) %>% 
-  summarise(l89 = quantile(spawners, probs = 0.065), 
-            u89 = quantile(spawners, probs = 0.945),
+  summarise(l95 = quantile(spawners, probs = 0.025), 
+            u95 = quantile(spawners, probs = 0.975),
             spawners = median(spawners))
 
 mean_arrival_day <- median(post$arrival[,j])
@@ -402,7 +375,7 @@ residence_df <- data.frame(
 )
 
 ggplot(example_data, aes(x = day + day_stand, y = spawners, group = type))+
-  geom_ribbon(aes(ymin = l89, ymax = u89), color = NA, alpha = 0.2)+
+  geom_ribbon(aes(ymin = l95, ymax = u95), color = NA, alpha = 0.2)+
   geom_textline(size = 4, linewidth = 1, aes(label = type), hjust = 0.65, family = "sans") +
   scale_x_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b ") %>% 
                        paste0(as.integer(format(as.Date(.x, origin = "2023-12-31"), "%d"))),
@@ -452,7 +425,7 @@ where $N_{y,d}$ is the observed number of spawners in year $y$ on day $d$, $\mu_
 \label{eq:eq-live}
 \end{equation}
 
-We assume that the spawners arrive over a range of days that follows a normal distribution, reside there for some days of spawning activity, and then die or leave the spawning grounds (other distributions for skewed or multimodal arrivals may be applicable). Thus, the proportion ofspawners that have arrived by a given date $d$ in year $y$ follows a cumulative normal distribution:
+We assume that the spawners arrive over a range of days that follows a normal distribution, reside there for some days of spawning activity, and then die or leave the spawning grounds (other distributions for skewed or multimodal arrivals may be applicable). Thus, the proportion of spawners that have arrived by a given date $d$ in year $y$ follows a cumulative normal distribution:
 
 \begin{equation}
 p^\text{arrived}_{y,d} = \Phi\left( \frac{ d - \mu^\text{arrival}_y }{ \sigma^\text{arrival}_y } \right),
@@ -1193,14 +1166,9 @@ increasing trend, averaging
 `r round(mean(apply(post$exit_spread[,1:5], 2, median)),1)` days in the
 first five years and
 `r round(mean(apply(post$exit_spread[,(length(unique(index_sk$year))-5):length(unique(index_sk$year))], 2, median)),1)`
-days in the last five years. We find that in years when spawners arrive
-later, arrival is spread over a longer period of time, suggesting that
-the date when the first fish arrive may be relatively constant across
-years, even if the overall distribution is variable. In contrast to the assumption in  @su2001 and @adkison2001 that residence time is a function of order of arrival (early arrivals stay longer), we do not find strong evidence that exit spread tends to be smaller than arrival spread in this system. This pattern has been identified in other studies, where it has been attributed to the fact that salmon of different ages and sexes may arrive at different times [@perrin1990; sockeye: @killick1955; pink: @fukushima1997; @dangel1988] so this difference warrants further study. 
+days in the last five years. We find that in years when spawners arrive later, arrival is spread over a longer period of time, suggesting that the date when the first fish arrive may be relatively constant across years, even if the overall distribution is variable. In contrast to the assumption in  @su2001 and @adkison2001 that residence time is a function of order of arrival (i.e., early arrivals stay longer), we did not find strong evidence that exit spread is consistently smaller than arrival spread for Osoyoos Lake Sockeye Salmon (which would be expected if earlier arrivals exit later and later arrivals exit sooner, compressing exit timing). However, because the model does not explicitly describe how residence time varies with arrival date at the individual level, this comparison should be interpreted as a population-level pattern rather than a direct measure of individual residence time. This pattern has been identified in other studies, where it has been attributed to the fact that salmon of different ages and sexes may arrive at different times [@perrin1990; sockeye: @killick1955; pink: @fukushima1997; @dangel1988] so this difference warrants further study. 
 
-In addition to improving estimation of the parameters themselves, the
-multivariate normal correlation structure reveals how arrival and exit
-processes co-vary. For Okanagan sockeye, we estimate that arrival spread is positively correlated with arrival timing and exit lag. This indicates that when arrival is more spread out, this pushes the average arrival date and exit date later. We also estimate that exit lag and exit spread are negatively correlated, suggesting that when the average date of exit is pushed later, fish tend to exit over a shorter time window. 
+In addition to improving estimation of the parameters themselves, the multivariate normal correlation structure reveals how arrival and exit processes co-vary. For Okanagan sockeye, we estimate that arrival spread is positively correlated with arrival timing and exit lag. This indicates that when arrival is more spread out, this pushes the average arrival date and exit date later. We also estimate that exit lag and exit spread are negatively correlated, suggesting that when the average date of exit is pushed later, fish tend to exit over a shorter time window. 
 
 Extending the analysis of Okanagan sockeye to estimate how the spawning
 timing depends on environmental conditions, and on the spawner's age and sex
@@ -1312,18 +1280,7 @@ count data were not well distinguished. We therefore elected to use the
 simpler model that implicitly assumes independence of consecutive survey
 counts.
 
-Salmon life cycles result in strong autocorrelations in spawner
-abundance. Including this in our model will, conceivably, improve
-individual abundance estimates. For sockeye, the four-year cycle
-identifiable in Figure \ref{fig:fig-runs} is frequently evident [@burgner1991;
-@ricker1950; @ricker1997]: adult returns are predominately the age 1.2
-offspring from spawners four years earlier. Because sockeye adults
-return two to six years after spawning, not just four, the
-autocorrelations are complicated. Extending this model to complete life
-histories will require a series of additional estimates (models):
-spawners to smolts, smolts to adult returns (SAR), fishing mortality,
-and prespawning mortality. These estimates are typically calculated so
-this extension is foreseeable.
+Salmon life cycles result in strong autocorrelations in spawner abundance. Including this in our model will, conceivably, improve individual abundance estimates. For sockeye, the four-year cycle identifiable in Figure \ref{fig:fig-runs} is frequently evident [@burgner1991; @ricker1950; @ricker1997]: adult returns are predominately the age 1.2 offspring from spawners four years earlier. Because sockeye adults return two to six years after spawning, not just four, the autocorrelations are complicated. Extending this model to complete life histories will require a series of additional estimates (models): spawners to smolts, smolts to adult returns (SAR), fishing mortality, and prespawning mortality. These estimates are typically calculated so this extension is foreseeable.
 
 # Conclusions
 
@@ -1344,26 +1301,7 @@ habitats, and species, and to the continued evolution of this approach.
 
 # Acknowledgements
 
-Diligence, care, and persistence by survey field teams from the Okanagan
-Nation Alliance (ONA, [syilx.org](https://syilx.org/)) resulted in a
-spawners dataset based on unusually thorough and consistent methods;
-their commitment to *cause to come back* is inspiring. This paper
-commemorates accomplishments of the late Dr. Kim Hyatt who designed,
-implemented, and supported this survey program. We thank Karilyn Alex
-(ONA) for access and permission regarding this proprietary data,
-possible through the data sharing agreement of the Canadian Okanagan
-Basin Technical Working Group (COBTWG). We thank Howard Stiff and Athena
-Ogden (Pacific Biological Station, Fisheries and Oceans Canada) and
-Elizabeth Ng (Four Peaks Environmental Ltd.) for the work required to
-reconcile and summarize 25 years of field notes and spreadsheets into
-the quality controlled and standardized dataset we received. Dr. James
-R. Irvine (Fisheries and Oceans Canada, retired) improved a preliminary
-version based on his extensive knowledge of salmon survey methods and
-related analyses. We used ChatGPT (model 4o) to proofread specific
-sections (e.g., mathematical notation and description of the model) of
-the manuscript that were provided as text excerpts, focusing on grammar,
-clarity, and accuracy. All AI-generated suggested edits were assessed
-and verified for accuracy before being incorporated.
+Diligence, care, and persistence by survey field teams from the Okanagan Nation Alliance (ONA, [syilx.org](https://syilx.org/)) resulted in a spawners dataset based on unusually thorough and consistent methods; their commitment to *cause to come back* is inspiring. This paper acknowledges the contributions of the late Dr. Kim Hyatt, who played a key role in the development and early implementation of the survey program in collaboration with the Okanagan Nation Alliance. We thank Karilyn Alex (ONA) for access and permission regarding this proprietary data, possible through the data sharing agreement of the Canadian Okanagan Basin Technical Working Group (COBTWG). We thank Howard Stiff and Athena Ogden (Pacific Biological Station, Fisheries and Oceans Canada) and Elizabeth Ng (Four Peaks Environmental Ltd.) for the work required to reconcile and summarize 25 years of field notes and spreadsheets into the quality controlled and standardized dataset we received. Dr. James R. Irvine (Fisheries and Oceans Canada, retired) improved a preliminary version based on his extensive knowledge of salmon survey methods and related analyses. We used ChatGPT (model 4o) to proofread specific sections (e.g., mathematical notation and description of the model) of the manuscript that were provided as text excerpts, focusing on grammar, clarity, and accuracy. All AI-generated suggested edits were assessed and verified for accuracy before being incorporated.
 
 ## Author contributions  
 Patrick L. Thompson: Methodology, Formal Analysis, Software (final models and simulations), Validation, Visualization, Writing – Original Draft, Review & Editing.  
