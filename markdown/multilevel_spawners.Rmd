@@ -244,71 +244,15 @@ post <- rstan::extract(fit)
 
 ## Spawner survey analyses
 
-Functions relating the abundance of spawners to the subsequent
-abundance of their offspring returning as adults ("recruits" to
-fisheries) are fundamental to the management of salmon fisheries and
-salmon habitats [@ricker1975; @hilborn1992]. For salmon, spawner
-abundance in a river, stream, or lake beach is typically estimated
-through repeated visual surveys – from a boat, a helicopter, a drone,
-while snorkeling or walking – that count the number of spawners present
-across multiple days during the spawning period. As part of the survey
-process, counts are adjusted for observer efficiency (estimated percent observed
-of salmon present, @hilborn1999) and extrapolated to survey areas not
-observed. Those adjustments are not considered in what follows.
-Converting repeated daily estimates of spawners present into a yearly
-estimate of spawner abundance requires accounting for two factors: (1)
-surveys typically do not cover every day of the spawning period, and (2)
-spawning fish generally remain on the spawning grounds for multiple
-days: 8.8-18.7 days for sockeye salmon; @perrin1990. Conventional
-methods adjust for these factors but rely on assumptions that can
-introduce bias and fail to account for uncertainty.
+Functions relating the abundance of spawners to the subsequent abundance of their offspring returning as adults ("recruits" to fisheries) are fundamental to the management of salmon fisheries and salmon habitats [@ricker1975; @hilborn1992]. For salmon, spawner abundance in a river, stream, or lake beach is typically estimated through repeated visual surveys – from a boat, a helicopter, a drone, while snorkeling or walking – that count the number of spawners present across multiple days during the spawning period. As part of the survey process, counts are adjusted for observer efficiency (estimated percent observed of salmon present, @hilborn1999) and extrapolated to survey areas not observed. Those adjustments are not considered in what follows. Converting repeated daily estimates of spawners present into a yearly estimate of spawner abundance requires accounting for two factors: (1) surveys typically do not cover every day of the spawning period, and (2) spawning fish generally remain on the spawning grounds for multiple days: 8.8-18.7 days for sockeye salmon; @perrin1990. Conventional methods adjust for these factors but rely on assumptions that can introduce bias and fail to account for uncertainty.
 
-The classic and still widely used method is based on *trapezoidal area
-under the curve* [TAUC\; @ames1977; @perrin1990]. This is a
-non-parametric approach, where "curve" means linear interpolations of
-counts between survey dates ([a Reimann
-sum](https://en.wikipedia.org/wiki/Riemann_sum "wikipedia")) to fill in
-missing survey days [@english1992; @irvine1992]. Prior knowledge about
-first and last dates for presence of spawners is required and often
-assumed. The resulting integral has units of $fish \times days$. To
-account for repeat observations of individual fish, total spawner
-abundance is calculated by dividing $fish \times days$ by the average
-residence time (survey life or stream life, $days$) of a spawner on the surveyed
-spawning ground. Residence time has been found to vary across years and
-across spawning grounds, so it is recommended that annual,
-spawning-ground-specific estimates should be used [@bocking1988;
-@perrin1990; @irvine1992]. There are a range of methods for estimating
-residence time [reviewed in @perrin1990]. Estimating residence time is
-difficult and requires additional surveying, so residence time is often
-assumed, sometimes based on similarity between populations [e.g.,
-@hyatt2010]. Residence time acts as a scalar on the survey counts and
-can introduce substantial bias to spawner abundance estimates if the
-assumed value is incorrect.
+A commonly used method for estimating spawner abundance in Pacific salmon systems is based on *trapezoidal area under the curve* [TAUC\; @ames1977; @perrin1990]. This is a non-parametric approach, where "curve" means linear interpolations of counts between survey dates ([a Reimann sum](https://en.wikipedia.org/wiki/Riemann_sum "wikipedia")) to fill in missing survey days [@english1992; @irvine1992]. Prior knowledge about first and last dates for presence of spawners is required and often assumed. The resulting integral has units of $fish \times days$. To account for repeat observations of individual fish, total spawner abundance is calculated by dividing $fish \times days$ by the average residence time (survey life or stream life, $days$) of a spawner on the surveyed spawning ground. Residence time has been found to vary across years and across spawning grounds, so it is recommended that annual, spawning-ground-specific estimates should be used [@bocking1988; @perrin1990; @irvine1992]. There are a range of methods for estimating residence time [reviewed in @perrin1990]. Estimating residence time is difficult and requires additional surveying, so residence time is often assumed, sometimes based on similarity between populations [e.g., @hyatt2010]. Residence time acts as a scalar on the survey counts and can introduce substantial bias to spawner abundance estimates if the assumed value is incorrect.
 
-To account for observation error, a continuous curve (normal, i.e., Gaussian, if symmetric; otherwise beta [@hilborn1999] or Weibull [@labelle2021], as
-examples) can be fit to the time series of survey estimates in a year
-using linear regression [@millar2012]. This produces a *Gaussian area
-under curve* (GAUC), where total spawning abundance is the integral of
-the curve, corrected for residence time as for TAUC. This parametric
-approach has been extended by applying hierarchical regression to
-analyze multiple years or spawning grounds simultaneously, enabling more
-reliable estimates of spawner abundance when data are sparse by
-leveraging information shared across years or locations [@adkison2001;
-@su2001]. GAUC improves upon TAUC by estimating precision for spawner
-abundance, but still relies on an assumed (independently estimated)
-residence time. Additionally, it assumes that the arrival and exit
-processes -- due to death for semelparous salmon -- combine to produce
-the assumed temporal distribution of spawners present on the spawning
-grounds.
+To account for observation error, a continuous curve (normal, i.e., Gaussian, if symmetric; otherwise beta [@hilborn1999] or Weibull [@labelle2021], as examples) can be fit to the time series of survey estimates in a year using linear regression [@millar2012]. This produces a *Gaussian area under curve* (GAUC), where total spawning abundance is the integral of the curve, corrected for residence time as for TAUC. This parametric approach has been extended by applying hierarchical regression to analyze multiple years or spawning grounds simultaneously, enabling more reliable estimates of spawner abundance when data are sparse by leveraging information shared across years or locations [@adkison2001; @su2001]. GAUC improves upon TAUC by estimating precision for spawner abundance, but still relies on an assumed (independently estimated) residence time. Additionally, it assumes that the arrival and exit processes -- due to death for semelparous salmon -- combine to produce the assumed temporal distribution of spawners present on the spawning grounds.
 
 ## Arrival-exit models
 
-Mechanistic models of the arrival and exit processes [@szerlong2008]
-address some of the limitations of the TAUC and GAUC approaches. As
-initially developed for salmon by @quinn1997, the number of spawners
-present during a survey is the number of arrivals cumulative to a survey date, minus
-exits cumulative to that date (Figure \ref{fig:fig-enterexit}). Average residence time was then an estimated parameter rather than an assumption. In the subsequent model by @hilborn1999, arrivals and exits
-were assumed to follow the same cumulative distribution. @su2001 and @adkison2001 extended this framework to make residence time a declining function of arrival date. They also allowed for interannual variation in the timing parameters, estimated for all years simultaneously in hierarchical regression to improve estimates in years with sparse data. Further variations were explored by @labelle2021, including multiple modes of spawner arrivals. Despite the practical utility of the hierarchical arrival-exit process model [@holt2008], it has not been widely adopted and TAUC is still commonly used [e.g., @atlas2021; @sounhein2022; @gleason2025; @ogden2025; @brown2026].
+Mechanistic models of the arrival and exit processes [@szerlong2008] address some of the limitations of the TAUC and GAUC approaches. As initially developed for salmon by @quinn1997, the number of spawners present during a survey is the number of arrivals cumulative to a survey date, minus exits cumulative to that date (Figure \ref{fig:fig-enterexit}). Average residence time was then an estimated parameter rather than an assumption. In the subsequent model by @hilborn1999, arrivals and exits were assumed to follow the same cumulative distribution. @su2001 and @adkison2001 extended this framework to make residence time a declining function of arrival date. They also allowed for interannual variation in the timing parameters, estimated for all years simultaneously in hierarchical regression to improve estimates in years with sparse data. Further variations were explored by @labelle2021, including multiple modes of spawner arrivals. Despite the practical utility of the hierarchical arrival-exit process model [@holt2008], it has not been widely adopted and TAUC is still commonly used [e.g., @atlas2021; @sounhein2022; @gleason2025; @ogden2025; @brown2026].
 
 This paper introduces an alternative version of the arrival-exit approach [e.g., @hilborn1999; @su2001]. Both approaches have three common parameters: (1) arrival timing, defined as the mean day of spawner arrivals; (2) arrival spread, the standard deviation of arrival dates; and (3) exit lag, the difference between mean arrival date and mean exit date. The key distinction lies in how the exit process is modelled. Su et al. (2001) modelled residence time as a declining function of arrival date such that earlier-arriving individuals remain longer on the spawning grounds, using a fixed functional form with parameters derived from an external study. In contrast, our model estimates a separate exit timing distribution with its own mean and spread, rather than specifying residence time as a function of arrival date (Figure \ref{fig:fig-enterexit}). This allows the exit process to vary flexibly among years and captures variation in residence time without imposing a fixed or explicitly arrival-dependent relationship. As a further improvement, we model the timing parameters as a multivariate normal distribution (MVN) with an estimated covariance structure. This allows for correlation among timing parameters by estimating their covariance structure. We use a hierarchical Bayesian framework, enabling estimation of interannual variation in both spawner timing and abundance. This hierarchical structure shares information across years, improving estimates when data are sparse while reducing the risk of over-fitting.
 
@@ -398,18 +342,7 @@ ggplot(example_data, aes(x = day + day_stand, y = spawners, group = type))+
 
 ## Model
 
-We modelled spawner abundance based on observed spawner counts using a
-series of hierarchical Bayesian models, fitted in the Stan programming
-language [@standevelopmentteam2020] by using the rStan package
-[@standevelopmentteam2020] in R v4.4.0 [@rcoreteam2025]. These models
-varied in the degree to which they allowed for interannual variation in
-the four timing parameters (arrival timing and spread, exit lag and
-spread) and whether those parameters were jointly estimated using a
-multivariate normal distribution (MVN) to account for correlations. All
-models follow the processes shown in Figure \ref{fig:fig-enterexit}. These models
-deal only with live spawners. Spawner counts are integers and can include
-zero, therefore we used a negative binomial distribution for the
-observation model:
+We modelled spawner abundance based on observed spawner counts using a series of hierarchical Bayesian models, fitted in the Stan programming language [@standevelopmentteam2020] by using the rStan package [@standevelopmentteam2020] in R v4.4.0 [@rcoreteam2025]. These models varied in the degree to which they allowed for interannual variation in the four timing parameters (arrival timing and spread, exit lag and spread) and whether those parameters were jointly estimated using a multivariate normal distribution (MVN) to account for correlations. All models follow the processes shown in Figure \ref{fig:fig-enterexit}. These models deal only with live spawners. Spawner counts are integers and can include zero, therefore we used a negative binomial distribution for the observation model:
 
 \begin{equation}
 N_{y,d} \sim \text{NegBinomial}(\mu_{y,d}, \phi)
@@ -446,7 +379,7 @@ To prevent numerical instability when values in Equation \ref{eq:eq-live} become
 \mu_{y,d} =  \exp\left( \log\left(1 + 10^4 \times p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d})\right) - \log(10^4) \right) \times N_y.
 \end{equation}
 
-This formulation is equivalent to Equation \ref{eq:eq-live}, with the addition of a small constant (1/10^4) to the proportion term. This adjustment ensures numerical stability when predicted values approach zero.
+This formulation is equivalent to Equation \ref{eq:eq-live}, with the addition of a small constant (1/10^4) to the proportion term. 
 
 In the equations above, we specified $\mu^\text{arrival}_y$, $\sigma^\text{arrival}_y$, $\mu_y^\text{exit lag}$, and $\sigma^\text{exit}_y$ using subscript $y$ to indicate that they vary from year to year. Some of these timing parameters may not need to vary annually in a model applied to a specific situation, so we compared a series of models with different combinations of varying and constant versions of these parameters (summarized in Figure \ref{fig:fig-modcompare}A) and evaluated their fit to withheld data [Leave One Out, @vehtari2017], as described in section 2.1.1.
 
