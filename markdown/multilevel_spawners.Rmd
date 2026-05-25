@@ -445,7 +445,7 @@ observation model:
 N_{y,d} \sim \text{NegBinomial}(\mu_{y,d}, \phi)
 \end{equation}
 
-where $N_{y,d}$ is the probability density distribution (PDD) for predicted counts, $\mu_{y,d}$ is the expected number of live spawners present in year $y$ on day $d$, and $\phi$ captures variability around $\mu_{y,d}$, including both observation error and natural variation that is not explicitly modelled. We assume that this expected number of spawners present, $\mu_{y,d}$, is a function of three unobserved (*i.e.*, latent) quantities that are estimated in our model: (1) $p^\text{arrived}_{y,d}$, the proportion of spawners that have arrived by day $d$; (2) $p^\text{exited}_{y,d}$, the proportion of spawners that have exited by day $d$, (*i.e.*, died or left the spawning grounds), and (3) $N_y$, the total spawner abundance in that year:
+where $N_{y,d}$ is the observed number of spawners in year $y$ on day $d$, $\mu_{y,d}$ is the expected number of live spawners present, and $\phi$ captures variability around $\mu_{y,d}$, including both observation error and natural variation that is not explicitly modelled. We assume that this expected number of spawners present, $\mu_{y,d}$, is a function of three unobserved (*i.e.*, latent) quantities that are estimated in our model: (1) $p^\text{arrived}_{y,d}$, the proportion of spawners that have arrived by day $d$; (2) $p^\text{exited}_{y,d}$, the proportion of spawners that have exited by day $d$, (*i.e.*, died or left the spawning grounds), and (3) $N_y$, the total spawner abundance in that year:
 
 \begin{equation}
 \mu_{y,d} \approx p^\text{arrived}_{y,d} \times (1 - p^\text{exited}_{y,d}) \times N_y.
@@ -497,7 +497,7 @@ where $\boldsymbol{\theta_y}$ is a vector of the four timing parameters in each 
 
 and $\boldsymbol{\mu}$ is a vector of the timing parameter group level means,
 \begin{equation}
-\boldsymbol{\mu} = [\mu^\text{arrival}, \log(\sigma^\text{arrival} - 1), \log(\sigma^\text{exit} - 1), \log(\mu^\text{exit lag} - 1)].
+\boldsymbol{\mu} = [\mu^\text{arrival}, \mu^{\text{arrival spread}}, \mu^{\text{exit spread}}, \mu^{\text{exit lag}}].
 \end{equation}
 
 The $\log(x - 1)$ transformation for the spread and lag parameters ensures that they remain positive and bounded away from zero, while also improving sampling stability, as described above. The parameter $\boldsymbol{\Sigma}$ is the residual covariance matrix, which describes both the amount of interannual variation in each timing parameter and the correlation among them. This structure jointly estimates the timing processes, allowing the model to capture interdependence between them, for example, if the exit lag is longer in years when arrival timing is earlier.
@@ -1406,6 +1406,8 @@ This study was supported by a Collaborative Agreement between Fisheries and Ocea
 
 library(knitr)
 
+fmt_num <- function(x) format(round(x, 2), trim = TRUE, nsmall = 0)
+
 param_table <- data.frame(
   Parameter = c(
     "$N_y$", "$\\mu^\\text{arrival}_y$", "$\\sigma^\\text{arrival}_y$",
@@ -1438,24 +1440,55 @@ param_table <- data.frame(
     "Interannual SD of exit spread",
     "Interannual SD of exit lag"
   ),
-  Prior = c(
-    sprintf("$\\log(N_y) \\sim \\text{Normal}(%.2f, %.2f)$", priors[1,2], priors[1,3]),
-    "$\\text{Normal}(\\mu^\\text{arrival}, \\sigma^\\text{arrival})$",
-    "$1 + \\exp(\\theta_y)$",
-    "$1 + \\exp(\\theta_y)$",
-    "$1 + \\exp(\\theta_y)$",
-    sprintf("$\\log(\\phi) \\sim \\text{Normal}(%.2f, %.2f)$", priors[7,2], priors[7,3]),
-    "$\\text{Normal or MVN}$",
-    "Estimated (LKJ prior on correlation)",
-    sprintf("$\\mu^\\text{arrival} \\sim \\text{Normal}(%.2f, %.2f)$", priors[2,2], priors[2,3]),
-    sprintf("$\\sigma^\\text{arrival} \\sim \\text{Lognormal}(\\log(%.2f), %.2f)$", priors[3,2], priors[3,3]),
-    sprintf("$\\mu^{\\text{arrival spread}} \\sim \\text{Normal}(%.2f, %.2f)$", priors[4,2], priors[4,3]),
-    sprintf("$\\mu^{\\text{exit spread}} \\sim \\text{Normal}(%.2f, %.2f)$", priors[4,2], priors[4,3]),
-    sprintf("$\\mu^{\\text{exit lag}} \\sim \\text{Normal}(\\log(%.2f), %.2f)$", priors[6,2], priors[6,3]),
-    sprintf("$\\sigma^{\\text{arrival spread}} \\sim \\text{Lognormal}(\\log(%.2f), %.2f)$", priors[5,2], priors[5,3]),
-    sprintf("$\\sigma^{\\text{exit spread}} \\sim \\text{Lognormal}(\\log(%.2f), %.2f)$", priors[5,2], priors[5,3]),
-    sprintf("$\\sigma^{\\text{exit lag}} \\sim \\text{Lognormal}(\\log(%.2f), %.2f)$", priors[5,2], priors[5,3])
-  )
+ Prior = c(
+  paste0("$\\log(N_y) \\sim \\text{Normal}(",
+         fmt_num(priors[1,2]), ", ",
+         fmt_num(priors[1,3]), ")$"),
+
+  "$\\text{Normal}(\\mu^\\text{arrival}, \\sigma^\\text{arrival})$",
+  "$1 + \\exp(\\theta_y)$",
+  "$1 + \\exp(\\theta_y)$",
+  "$1 + \\exp(\\theta_y)$",
+
+  paste0("$\\log(\\phi) \\sim \\text{Normal}(",
+         fmt_num(priors[7,2]), ", ",
+         fmt_num(priors[7,3]), ")$"),
+
+  "$\\text{Normal or MVN}$",
+  "Estimated (LKJ prior on correlation)",
+
+  paste0("$\\mu^\\text{arrival} \\sim \\text{Normal}(",
+         fmt_num(priors[2,2]), ", ",
+         fmt_num(priors[2,3]), ")$"),
+
+  paste0("$\\sigma^\\text{arrival} \\sim \\text{Lognormal}(\\log(",
+         fmt_num(priors[3,2]), "), ",
+         fmt_num(priors[3,3]), ")$"),
+
+  paste0("$\\mu^{\\text{arrival spread}} \\sim \\text{Normal}(",
+         fmt_num(priors[4,2]), ", ",
+         fmt_num(priors[4,3]), ")$"),
+
+  paste0("$\\mu^{\\text{exit spread}} \\sim \\text{Normal}(",
+         fmt_num(priors[4,2]), ", ",
+         fmt_num(priors[4,3]), ")$"),
+
+  paste0("$\\mu^{\\text{exit lag}} \\sim \\text{Normal}(\\log(",
+         fmt_num(priors[6,2]), "), ",
+         fmt_num(priors[6,3]), ")$"),
+
+  paste0("$\\sigma^{\\text{arrival spread}} \\sim \\text{Lognormal}(\\log(",
+         fmt_num(priors[5,2]), "), ",
+         fmt_num(priors[5,3]), ")$"),
+
+  paste0("$\\sigma^{\\text{exit spread}} \\sim \\text{Lognormal}(\\log(",
+         fmt_num(priors[5,2]), "), ",
+         fmt_num(priors[5,3]), ")$"),
+
+  paste0("$\\sigma^{\\text{exit lag}} \\sim \\text{Lognormal}(\\log(",
+         fmt_num(priors[5,2]), "), ",
+         fmt_num(priors[5,3]), ")$")
+)
 )
 
 kable(param_table, escape = FALSE,
