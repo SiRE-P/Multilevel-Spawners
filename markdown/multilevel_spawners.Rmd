@@ -48,7 +48,7 @@ header-includes:
 # Abstract
 Spawner abundance is a fundamental variable for salmon management models, but conventional methods (trapezoidal area under the curve) do not estimate the precision of abundance, and risk being biased by an assumed residence time. Here we present a hierarchical model that predicts visual counts of spawners by modelling the process and timing of spawner arrivals and exits. Our model provides annual estimates of spawner abundance, arrival timing, arrival spread, exit timing, and exit spread. By directly estimating these parameters and integrating uncertainty into abundance estimates, our approach improves the accuracy and reliability of spawner abundance estimates. We first demonstrate how the model accurately recovers parameters from simulated data, and then demonstrate its application by estimating 25 years of spawner abundance of wild sockeye salmon in the Okanagan River (BC, Canada). Our median estimated residence time of 9.1 days is shorter than the constant 11 days previously assumed for this population, and has considerable interannual variation (6.2–16.5 days). Thus, our estimated abundances are 15.7% higher, on average, but annual deviations range from -43 to +51%.
 
-\noindent\textbf{Keywords:} salmon; Oncorhynchus; spawner; spawner survey; Osoyoos Lake; Okanagan River; Columbia River
+\noindent\textbf{Keywords:} Oncorhynchus; spawner; spawner survey; Osoyoos Lake; Okanagan River; Columbia River
 
 \newpage
 
@@ -407,7 +407,7 @@ The $\log(x - 1)$ transformation for the spread and lag parameters ensures that 
 
 Chains were initialized with random draws from biologically plausible ranges for timing, abundance, and overdispersion parameters (Table \ref{tab:tbl-init}). This was necessary because Stan's default initialization often led to poor convergence, with chains exploring different regions of the parameter space. Using biologically plausible initialization improved adaptation and ensured all chains converged to the same posterior distribution.
 
-We used ChatGPT (model 4o) as a tool to support Stan model development, including brainstorming model structure and identifying causes of convergence issues. ChatGPT was not used to generate Stan code directly, and all suggestions were reviewed and verified by the authors for logic and accuracy.
+We used ChatGPT (Model 4o) as a tool to support Stan model development, including brainstorming model structure and identifying causes of convergence issues. ChatGPT was not used to generate Stan code directly, and all suggestions were reviewed and verified by the authors for logic and accuracy.
 
 ### Diagnostics
 
@@ -606,7 +606,7 @@ if(!file.exists("../data/simulations.RData")){
 }
 ```
 
-To quantify how reliably the statistical model can estimate the annual values for run size and the four timing parameters, we challenged our model with simulated data. The simulations were generated using the same parameters as the statistical model. Each simulation consisted of 20 years of observations, where the annual parameter values governing the spawning timing and run size were drawn randomly from the distributions in Table \ref{tab:tbl-sim}. These yearly parameters are considered to be the *true* values to which we compare the estimated values from the statistical model. Daily time series for the presence of spawners each day,  predicted from those *true* values in the model, were modified by multiplicative normal sampling error (20% precision, which roughly matches the estimated precision in the Osoyoos data) to generate *observed* data. To test the sensitivity of our model to different sampling frequencies, we contrasted results when we subsampled these time series with 1, 3, 5 and 7 day gaps. We then ran 20 replicate simulations to ensure that our results were representative. We fit these observed data with statistical model 8 (Figure \ref{fig:fig-modcompare}), which is the same as our selected model 9 but without the multivariate correlation structure between parameters. Because our goal was to test recovery of known values rather than parameter correlations, we did not include this additional complexity in our simulations.
+To quantify how reliably the statistical model can estimate the annual values for run size and the four timing parameters, we challenged our model with simulated data. The simulations were generated using the same parameters as the statistical model. Each simulation consisted of 20 years of observations, where the annual parameter values governing the spawning timing and run size were drawn randomly from the distributions in Table \ref{tab:tbl-sim}. These yearly parameters are considered to be the *true* values to which we compare the estimated values from the statistical model. Daily time series for the presence of spawners each day,  predicted from those *true* values in the model, were modified by multiplicative normal sampling error (20% precision, which roughly matches the estimated precision in the Osoyoos data) to generate *observed* data. To test the sensitivity of our model to different sampling frequencies, we contrasted results when we subsampled these time series with 1, 3, 5 and 7 day gaps. We then ran 20 replicate simulations to ensure that our results were representative. We fit these observed data with statistical Model 8 (Figure \ref{fig:fig-modcompare}), which is the same as our selected Model 9 but without the multivariate correlation structure between parameters. Because our goal was to test recovery of known values rather than parameter correlations, we did not include this additional complexity in our simulations.
 
 We quantified coverage as the proportion of simulations in which the true value fell within the 95% posterior credible interval. We quantified precision as the median absolute deviation (MAD, a robust version of standard deviation) of the posterior draws around the median, and quantified bias as the median of ratios of fitted over true values. 
 
@@ -630,7 +630,7 @@ TAUC, with an assumed residence time of 11 days [@hyatt2010]. This
 number was selected based on the estimate for the Early Stuart Sockeye
 stock [@perrin1990] because that stock has similar average body size,
 migration distance, and migratory timing [@hyatt2010]. Later,
-@shardlow2011 used tilt tags on spawning sockeye in the Okanagan River
+@shardlow2011 used mortality tags on spawning sockeye in the Okanagan River
 and estimated the residence time to be 14.1 (females) and 13.7 (males)
 days in 2006, and 14.1 (females) and 11.9 (males) days in 2007.
 Nevertheless, 11 days has been the consistently assumed value for AUC
@@ -646,12 +646,12 @@ bridge. Survey methods are described in detail in
 @machin2019. No fieldwork permit was required for the surveys as they are visual counts and they fall within the Syilx title and rights regarding Okanagan sockeye. Weekly surveys during the initial migration phase are
 increased to three-day intervals during the peak spawning period
 (generally October-November). A three or four person crew performs
-visual surveys of the Index section from a boat. Two observers focus on
+visual surveys of the Index Section from a boat. Two observers focus on
 counting live sockeye (holding and spawning), one on each side of the
 middle of the boat, while another one or two observers count dead
 sockeye and other species (Chinook, Kokanee, and Rainbow Trout) from the
 front of the boat. In addition, side channels throughout the Index
-section are walked and fish are enumerated [@machin2019]. Since 2012, enumeration of each individual reach within the Index section is available; however, we have used the summed counts across all reaches, because this is the
+Section are walked and fish are enumerated [@machin2019]. Since 2012, enumeration of each individual reach within the Index Section is available; however, we have used the summed counts across all reaches, because this is the
 resolution of data available from 2000--2011. Limited spawning for the
 Osoyoos population also occurs in the Okanagan River downstream of the
 Index Section, and in the section between Vaseux Lake and the Skaha Lake
@@ -678,22 +678,13 @@ Nation Alliance). Furthermore, our method deals simply with survey
 counts, not with observation methods. Complications from co-occurring
 Kokanee were addressed using a model similar to ours by @adkison2001.
 
-Although the enumeration survey crews count dead Sockeye, the dead surveys do not
-provide a consistent estimate of the accumulation of dead spawners that
-could be used in our model. Dead fish are enumerated but not marked or
-removed and so can potentially be counted multiple times across survey
-dates. However, there is a separate *dead pitch* crew that collects
-biosamples multiple times over the course of the spawning period, but at
-a lower frequency than the live counts are conducted. When doing so,
-this crew removes the sampled fish. Therefore, the counts of dead fish
-by the enumeration crew represent accumulated dead spawners, with
-infrequent removal, which is not easily accounted for in a model.
+Although the enumeration survey crews count dead Sockeye, the dead surveys do not provide a consistent estimate of the accumulation of dead spawners that could be used in our model. Dead fish are enumerated but not marked or removed and so can potentially be counted multiple times across survey dates. However, there is a separate *dead pitch* crew that collects biosamples multiple times over the course of the spawning period, but at a lower frequency than the live counts are conducted. When doing so, this crew removes the sampled fish three times per year, which is approximately weekly once dead fish start accumulating on the spawning grounds. Therefore, the counts of dead fish by the enumeration crew represent accumulated dead spawners, with periodic removal, which is not easily accounted for in a model.
 
 # Results
 
 ## Model selection and convergence
 
-Based on ELPD statistics (Figure \ref{fig:fig-modcompare}B) we selected model 9 as the best among those explored. This model was the most structurally complex of those considered and it included annual variation in spawner abundance, arrival timing, arrival spread, exit spread, and exit lag with a multivariate normal (MVN) structure in the annual variation of the four timing parameters.
+Based on ELPD statistics (Figure \ref{fig:fig-modcompare}B) we selected Model 9 as the best among those explored. This model was the most structurally complex of those considered and it included annual variation in spawner abundance, arrival timing, arrival spread, exit spread, and exit lag with a multivariate normal (MVN) structure in the annual variation of the four timing parameters.
 
 ```{r fig-modcompare, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 5, fig.width = 9, fig.align= 'center', fig.cap= "Model summary and comparison. Panel A shows which parameters or model structure that were held constant or not included (white) versus those that varied or were included (black) in each of the candidate models (rows). Panel B shows the relative expected log predictive density ($\\Delta\\mathrm{ELPD}$) compared to the model with the highest out-of-sample predictive accuracy. Panel C shows the effective number of parameters ($\\mathrm{p}_\\mathrm{loo}$). The model with the highest out-of-sample predictive accuracy is highlighted in red in panels B and C. Points and error bars (B and C) represent means and standard errors. Note, that the x-axis in panel B is pseudo log transformed (inverse hyperbolic sine) to highlight differences among the best performing models."}
 
@@ -767,25 +758,15 @@ data.frame(model = 1:9,
 ```
 
 
-The effective number of parameters ($\mathrm{p}_{\mathrm{loo}}$)
-increased when arrival timing variation was introduced (model 1 *vs.*
-2), and also when any of arrival spread, exit spread, or exit lag were
-allowed to vary (models 3 to 9; Figure \ref{fig:fig-modcompare}C). However, all models
-with variation in any or all of these parameters (models 3 to 9) had
-similar numbers of effective parameters.
+The effective number of parameters ($\mathrm{p}_{\mathrm{loo}}$) increased when arrival timing variation was introduced (Model 1 *vs.* 2), and also when any of arrival spread, exit spread, or exit lag were allowed to vary (Models 3 to 9; Figure \ref{fig:fig-modcompare}C). However, all models with variation in any or all of these parameters (Models 3 to 9) had similar numbers of effective parameters.
 
-Convergence was good for model 9; the highest $\hat{R}$ was
-`r round(max(worst_Rhat$Rhat, na.rm = TRUE),3)` and
-`r round(mean(worst_Rhat$n_eff>400, na.rm = TRUE)*100, 1)`% of the
-parameters had effective sample sizes $>400$ (min =
-`r round(min(worst_Rhat$n_eff, na.rm = TRUE))`).
+Convergence was good for Model 9; the highest $\hat{R}$ was `r round(max(worst_Rhat$Rhat, na.rm = TRUE),3)` and `r round(mean(worst_Rhat$n_eff>400, na.rm = TRUE)*100, 1)`% of the parameters had effective sample sizes $>400$ (min = `r round(min(worst_Rhat$n_eff, na.rm = TRUE))`).
 
 ## Model fit to simulated data
 
-We find that the model is able to estimate the parameters used to
-generate our simulated data. Regardless of the gap between surveys, the true value of all parameters falls within the 95% credible interval in at least 95% of annual estimates (Figure \ref{fig:fig-sims}A). We find that estimates become less precise as the survey gap increases (Figure \ref{fig:fig-sims}B), particularly for exit lag and arrival timing. The model tends to overestimate exit lag (Figure \ref{fig:fig-sims}C), but this is not consistent across years or simulations. Otherwise, our estimates of bias suggest that there is no tendency for any of the other parameters to be over- or underestimated.
+We find that the model is able to estimate the parameters used to generate our simulated data. Regardless of the gap between surveys, the true value of all parameters falls within the 95% credible interval in at least 95% of annual estimates (Figure \ref{fig:fig-sims}A). We find that estimates become less precise as the survey gap increases (Figure \ref{fig:fig-sims}B), particularly for exit lag and arrival timing. The model tends to overestimate exit lag (Figure \ref{fig:fig-sims}C), but this is not consistent across years or simulations. Otherwise, our estimates of bias suggest that there is no tendency for any of the other parameters to be over- or underestimated.
 
-```{r fig-sims, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 9, fig.align= 'center', fig.cap= "Credible interval (95%) coverage (A), median absolute deviation (B), bias (C) for each parameter for simulated data as a function of increasing survey gap (days). All measures compare modelled estimates with true values used to generate the simulations. In panel A, values represent the percent of annual estimates falling within the 95% credible interval, pooled across 20 replicate simulations. In panels B and C, summaries are computed across annual estimates, pooled over 20 replicate simulations, each spanning 20 years. In panels B and C, points show medians and intervals show the 66% and 95% distributions. Results are based on model 8, which does not include the MVN structure."}
+```{r fig-sims, echo=FALSE, , warning=FALSE, message=FALSE, fig.height = 4, fig.width = 9, fig.align= 'center', fig.cap= "Credible interval (95%) coverage (A), median absolute deviation (B), bias (C) for each parameter for simulated data as a function of increasing survey gap (days). All measures compare modelled estimates with true values used to generate the simulations. In panel A, values represent the percent of annual estimates falling within the 95% credible interval, pooled across 20 replicate simulations. In panels B and C, summaries are computed across annual estimates, pooled over 20 replicate simulations, each spanning 20 years. In panels B and C, points show medians and intervals show the 66% and 95% distributions. Results are based on Model 8, which does not include the MVN structure."}
 
  ggplot(sim_summary |> group_by(gap, .variable) |> summarise(in_95_perc = mean(in_95)*100) , aes(x = gap, y = in_95_perc, color = .variable))+
   geom_hline(yintercept = 100, lty = 2)+
@@ -1031,14 +1012,7 @@ time could be estimated from visual spawner data. As in @su2001 and
 interannual variability in the timing parameters, while reducing the
 risk of overfitting to noisy or sparse data. 
 
-In our application to Okanagan sockeye, we estimate the median *effective residence* *time* to
-be `r round(median(effective_residence), 1)` days, which is lower than the
-previously assumed 11 days [@hyatt2010], and the 11.9 to 14.1
-day estimates based on tilt tags in 2006 and 2007 [@shardlow2011].
-Furthermore, effective residence time varies across years from
-`r round(min(apply(effective_residence, 2, median)), 1)` to
-`r round(max(apply(effective_residence, 2, median)), 1)` days,
-suggesting that assuming a fixed value introduces considerable bias in the spawner abundance estimates in some years. This is reflected in the fact that our estimated spawner abundances range from as low as `r -round(min(perc_diff$perc_diff), 1)`% lower to `r round(max(perc_diff$perc_diff), 1)`% higher than those estimated using TAUC with an assumed 11 day residence. 
+In our application to Okanagan sockeye, we estimate the median *effective residence* *time* to be `r round(median(effective_residence), 1)` days, which is lower than the previously assumed 11 days [@hyatt2010], and the 11.9 to 14.1 day estimates based on mortality tags in 2006 and 2007 [@shardlow2011]. Furthermore, effective residence time varies across years from `r round(min(apply(effective_residence, 2, median)), 1)` to `r round(max(apply(effective_residence, 2, median)), 1)` days, suggesting that assuming a fixed value introduces considerable bias in the spawner abundance estimates in some years. This is reflected in the fact that our estimated spawner abundances range from as low as `r -round(min(perc_diff$perc_diff), 1)`% lower to `r round(max(perc_diff$perc_diff), 1)`% higher than those estimated using TAUC with an assumed 11 day residence. 
 
 
 Comparing our annual estimates of effective residence time in 2006 and 2007 to those from
@@ -1231,7 +1205,7 @@ habitats, and species, and to the continued evolution of this approach.
 
 # Acknowledgements
 
-Diligence, care, and persistence by survey field teams from the Okanagan Nation Alliance (ONA, [syilx.org](https://syilx.org/)) resulted in a spawners dataset based on unusually thorough and consistent methods; their commitment to *cause to come back* is inspiring. This paper acknowledges the contributions of the late Dr. Kim Hyatt, who played a key role in the development and early implementation of the survey program in collaboration with the Okanagan Nation Alliance. We thank Karilyn Alex (ONA) for access and permission regarding this proprietary data, possible through the data sharing agreement of the Canadian Okanagan Basin Technical Working Group (COBTWG). We thank Howard Stiff and Athena Ogden (Pacific Biological Station, Fisheries and Oceans Canada) and Elizabeth Ng (Four Peaks Environmental Ltd.) for the work required to reconcile and summarize 25 years of field notes and spreadsheets into the quality controlled and standardized dataset we received. Dr. James R. Irvine (Fisheries and Oceans Canada, retired) improved a preliminary version based on his extensive knowledge of salmon survey methods and related analyses. We used ChatGPT (model 4o) to proofread specific sections (e.g., mathematical notation and description of the model) of the manuscript that were provided as text excerpts, focusing on grammar, clarity, and accuracy. All AI-generated suggested edits were assessed and verified for accuracy before being incorporated.
+Diligence, care, and persistence by survey field teams from the Okanagan Nation Alliance (ONA, [syilx.org](https://syilx.org/)) resulted in a spawners dataset based on unusually thorough and consistent methods; their commitment to *cause to come back* is inspiring. This paper acknowledges the contributions of the late Dr. Kim Hyatt, who played a key role in the development and early implementation of the survey program in collaboration with the Okanagan Nation Alliance. We thank Karilyn Alex (ONA) for access and permission regarding this proprietary data, possible through the data sharing agreement of the Canadian Okanagan Basin Technical Working Group (COBTWG). We thank Howard Stiff and Athena Ogden (Pacific Biological Station, Fisheries and Oceans Canada) and Elizabeth Ng (Four Peaks Environmental Ltd.) for the work required to reconcile and summarize 25 years of field notes and spreadsheets into the quality controlled and standardized dataset we received. Dr. James R. Irvine (Fisheries and Oceans Canada, retired) improved a preliminary version based on his extensive knowledge of salmon survey methods and related analyses. We used ChatGPT (Model 4o) to proofread specific sections (e.g., mathematical notation and description of the model) of the manuscript that were provided as text excerpts, focusing on grammar, clarity, and accuracy. All AI-generated suggested edits were assessed and verified for accuracy before being incorporated.
 
 ## Author contributions  
 Patrick L. Thompson: Methodology, Formal Analysis, Software (final models and simulations), Validation, Visualization, Writing – Original Draft, Review & Editing.  
@@ -1244,9 +1218,7 @@ The authors declare no competing interests.
 
 ## Data Availability
 
-The data used in this study are the property of the Okanagan Nation
-Alliance. Please contact them directly concerning availability and
-acknowledgements: [Sylix.org](sylix.org).
+The data used in this study are the property of the Okanagan Nation Alliance. Please contact them directly concerning availability and acknowledgements: [Syilx.org](syilx.org).
 
 All scripts and stan model code are available for public access on
  GitHub (https://github.com/SiRE-P/Multilevel-Spawners) and Zenodo (https://doi.org/10.5281/zenodo.18395418).
