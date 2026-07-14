@@ -1,0 +1,364 @@
+---
+title: |
+  Supplementary Figures and Tables
+
+  for
+
+  *Estimating spawning salmon abundance from visual surveys: a hierarchical model of arrival and exit dynamics*
+
+author: "| Patrick L. Thompson$^{1,2}$^[Corresponding author: patrick.thompson@dfo-mpo.gc.ca; ORCID: 0000-0002-5278-9045], Scott A. Akenhead$^{1,3}$^[Retired; ORCID: 0000-0003-1218-3118], Colette Louie$^4$\n|\n|
+  $^1$These authors should be considered joint first authors.\n|
+  $^2$Pacific Science Enterprise Centre, Fisheries and Oceans Canada, West Vancouver, B.C., Canada\n|
+  $^3$Pacific Biological Station, Fisheries and Oceans Canada, Nanaimo, B.C., Canada\n|
+  $^4$Osoyoos Indian Band, Oliver, B.C., Canada\n"
+
+output:
+    bookdown::pdf_document2:
+      toc: false
+      number_sections: false
+      fig_caption: true
+      keep_tex: false
+      mathjax: default
+csl: ../../../../citation_resources/canadian-journal-of-fisheries-and-aquatic-sciences.csl
+bibliography: bibliography.bib
+always_allow_html: true
+link-citations: yes
+
+classoption:
+  - leqno
+
+
+header-includes:
+  - |
+    \usepackage{lineno}
+    \linenumbers
+    \leftlinenumbers
+  - |
+    \usepackage{setspace}
+    \doublespacing
+  - |
+    \usepackage{mathptmx}
+  - |
+    \usepackage{amsmath}
+  - |
+    \newcommand{\beginsupplement}{%
+      \setcounter{equation}{0}%
+      \renewcommand{\theequation}{S.\arabic{equation}}%
+      \setcounter{table}{0}%
+      \renewcommand{\thetable}{S\arabic{table}}%
+      \setcounter{figure}{0}%
+      \renewcommand{\thefigure}{S\arabic{figure}}%
+    }
+---
+
+```{r setup, include = FALSE}
+library(knitr)
+library(magrittr)
+library(tidyverse)
+library(tidybayes)
+library(rstan)
+library(loo)
+library(patchwork)
+library(ggrepel)
+library(janitor)
+library(scales)
+library(geomtextpath)
+library(lubridate)
+library(ggallin)
+library(kableExtra)
+library(ggokabeito)
+
+theme_set(theme_bw())
+```
+
+\clearpage
+\appendix
+
+```{=latex}
+\renewcommand{\thefigure}{S\arabic{figure}}
+\renewcommand{\thetable}{S\arabic{table}}
+\setcounter{figure}{0}
+\setcounter{table}{0}
+```
+
+```{r loaddata, include = FALSE}
+load("../data/supp_outputs.RData")
+```
+
+```{r tbl-priors, echo = FALSE, warning=FALSE, message=FALSE}
+
+library(knitr)
+
+fmt_num <- function(x) format(round(x, 2), trim = TRUE, nsmall = 0)
+
+param_table <- data.frame(
+  Parameter = c(
+    "$N_y$", "$\\mu^\\text{arrival}_y$", "$\\sigma^\\text{arrival}_y$",
+    "$\\mu^\\text{exit lag}_y$", "$\\sigma^\\text{exit}_y$", "$\\phi$",
+    "$\\theta_y$", "$\\boldsymbol{\\Sigma}$",
+    "$\\mu^\\text{arrival}$", "$\\sigma^\\text{arrival}$",
+    "$\\mu^{\\text{arrival spread}}$", "$\\mu^{\\text{exit spread}}$", "$\\mu^{\\text{exit lag}}$",
+    "$\\sigma^{\\text{arrival spread}}$", "$\\sigma^{\\text{exit spread}}$", "$\\sigma^{\\text{exit lag}}$"
+  ),
+  Level = c(
+    rep("Year", 5), "Global",
+    "Year (latent)", "Hyper (MVN)",
+    rep("Hyper", 8)
+  ),
+  Description = c(
+    "Total spawner abundance",
+    "Mean arrival day",
+    "Arrival timing spread",
+    "Lag between arrival and exit",
+    "Exit timing spread",
+    "Negative binomial dispersion parameter",
+    "Latent parameter for transformed spread and lag",
+    "Covariance among timing parameters (MVN models only)",
+    "Mean arrival timing across years",
+    "Interannual SD in arrival timing",
+    "Mean (log-scale) arrival spread",
+    "Mean (log-scale) exit spread",
+    "Mean (log-scale) exit lag",
+    "Interannual SD of arrival spread",
+    "Interannual SD of exit spread",
+    "Interannual SD of exit lag"
+  ),
+ Prior = c(
+  paste0("$\\log(N_y) \\sim \\text{Normal}(",
+         fmt_num(priors[1,2]), ", ",
+         fmt_num(priors[1,3]), ")$"),
+
+  "$\\text{Normal}(\\mu^\\text{arrival}, \\sigma^\\text{arrival})$",
+  "$1 + \\exp(\\theta_y)$",
+  "$1 + \\exp(\\theta_y)$",
+  "$1 + \\exp(\\theta_y)$",
+
+  paste0("$\\log(\\phi) \\sim \\text{Normal}(",
+         fmt_num(priors[7,2]), ", ",
+         fmt_num(priors[7,3]), ")$"),
+
+  "$\\text{Normal or MVN}$",
+  "Estimated (LKJ prior on correlation)",
+
+  paste0("$\\mu^\\text{arrival} \\sim \\text{Normal}(",
+         fmt_num(priors[2,2]), ", ",
+         fmt_num(priors[2,3]), ")$"),
+
+  paste0("$\\sigma^\\text{arrival} \\sim \\text{Lognormal}(\\log(",
+         fmt_num(priors[3,2]), "), ",
+         fmt_num(priors[3,3]), ")$"),
+
+  paste0("$\\mu^{\\text{arrival spread}} \\sim \\text{Normal}(",
+         fmt_num(priors[4,2]), ", ",
+         fmt_num(priors[4,3]), ")$"),
+
+  paste0("$\\mu^{\\text{exit spread}} \\sim \\text{Normal}(",
+         fmt_num(priors[4,2]), ", ",
+         fmt_num(priors[4,3]), ")$"),
+
+  paste0("$\\mu^{\\text{exit lag}} \\sim \\text{Normal}(\\log(",
+         fmt_num(priors[6,2]), "), ",
+         fmt_num(priors[6,3]), ")$"),
+
+  paste0("$\\sigma^{\\text{arrival spread}} \\sim \\text{Lognormal}(\\log(",
+         fmt_num(priors[5,2]), "), ",
+         fmt_num(priors[5,3]), ")$"),
+
+  paste0("$\\sigma^{\\text{exit spread}} \\sim \\text{Lognormal}(\\log(",
+         fmt_num(priors[5,2]), "), ",
+         fmt_num(priors[5,3]), ")$"),
+
+  paste0("$\\sigma^{\\text{exit lag}} \\sim \\text{Lognormal}(\\log(",
+         fmt_num(priors[5,2]), "), ",
+         fmt_num(priors[5,3]), ")$")
+)
+)
+
+kable(param_table, escape = FALSE,
+      caption = "Model parameters, roles, and prior distributions used across the set of candidate models. Not all parameters are present in every model variant, as described in the main text.",
+       booktabs = TRUE,
+  linesep = "",
+  longtable = TRUE
+) |>
+  kableExtra::kable_styling(latex_options = c("repeat_header", "hold_position")) |> 
+  column_spec(3, width = "5cm") %>%  # Description
+  column_spec(4, width = "6.2cm")
+
+```
+
+
+```{r tbl-init, echo=FALSE, warning=FALSE, message=FALSE}
+init.df <- data.frame(
+  parameter = c(
+    "$\\log(N_y)$",
+    "$\\mu^\\text{arrival}$",
+    "$\\sigma^\\text{arrival}$",
+    "$\\mu^{\\text{arrival spread}}$",
+    "$\\mu^{\\text{exit spread}}$",
+    "$\\mu^{\\text{exit lag}}$",
+    "$\\phi$"
+  ),
+  mu = c(10, 40, "log(1)", 2, 2.5, 2.5, "log(50)"),
+  sigma = c(0.5, 2, 0.2, 0.2, 0.2, 0.2, 0.1),
+  dist = c("Normal", "Normal", "Lognormal", "Normal", "Normal", "Normal", "Lognormal")
+)
+
+colnames(init.df) <- c(
+  "Parameter",
+  "$\\mu$",
+  "$\\sigma$",
+  "Distribution"
+)
+
+knitr::kable(
+  init.df , escape = FALSE,
+  caption = "Initialization settings for the Stan models. In models where parameters lack hierarchical structure, the same prior specified for the corresponding parameter was used. All other parameters used Stan's default initialization (random draws between -2 and 2).",
+  booktabs = TRUE,
+  linesep = "",
+  longtable = TRUE
+) %>%
+  kableExtra::kable_styling(latex_options = "repeat_header")
+```
+
+
+```{r tbl-sim, echo=FALSE, warning=FALSE, message=FALSE}
+sim_params <- data.frame(
+  parameter = c(
+    "$\\log(N_y)$",
+    "$\\mu^\\text{arrival}_y$",
+    "$\\sigma^\\text{arrival}_y$",
+    "$\\mu^\\text{exit lag}_y$",
+    "$\\sigma^\\text{exit}_y$"
+  ),
+  mu = c(
+    log_run_mu,
+    arrival_timing_mu,
+    arrival_spread_mu,
+    exit_lag_mu,
+    exit_spread_mu
+  ),
+  sigma = c(
+    log_run_sigma,
+    arrival_timing_sigma,
+    arrival_spread_sigma,
+    exit_lag_sigma,
+    exit_spread_sigma
+  ),
+  distribution = c(
+    "Normal",
+    "Normal",
+    "Normal",
+    "Normal",
+    "Normal"
+  )
+)
+
+colnames(sim_params) <- c(
+  "Parameter",
+  "$\\mu$",
+  "$\\sigma$",
+  "Distribution"
+)
+
+
+knitr::kable(
+  sim_params, escape = FALSE,
+  caption   = "Simulation parameters used to generate synthetic datasets. For each parameter, yearly values were drawn from the specified normal distribution with mean and standard deviation.",
+  booktabs = TRUE,
+  linesep = "",
+  longtable = TRUE
+) |>
+  kableExtra::kable_styling(latex_options = "repeat_header")
+```
+
+
+
+```{r fig-map, echo = FALSE, warning=FALSE, message=FALSE, fig.cap = "The spawning grounds of the sockeye salmon (Oncorhynchus nerka) population rearing in the North Basin of Osoyoos Lake are located 20–30 km upstream in the Okanagan River below McIntyre Dam at the outlet of Vaseux Lake. River flows affecting spawners, eggs, and fry are monitored at the Environment and Climate Change Canada hydrometric station 08NM085 (formerly 08NM0001). Map produced by Margot Stockwell (Fisheries and Oceans Canada). Base spatial data were derived from GeoBC (Province of British Columbia). Spatial data are referenced to the NAD83 Albers Equal Area Conic projected coordinate system.", out.width="5in"}
+
+knitr::include_graphics("../figures/Okanagan_to_Osoyoo_Lakes.png")
+```
+
+
+```{r fig-spawnercurves, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Observed versus estimated spawners present over the spawning period in each year (panels). Points show the observed counts; the lines and shaded bands show the posterior median and the 95% credible intervals. Y-axis limits vary across panels to emphasize model fit rather than variation across years.", fig.align='center', fig.height=7, fig.width=8}
+spawn_curves.df <- data.frame()
+for(j in 1:ncol(post$log_run)){
+  live <- sapply(-5:max(sp_dat$day), FUN = function(x) {
+    entered <- pnorm(x, post$arrival[,j], post$arrival_spread[,j])
+    exited <- pnorm(x, post$arrival[,j] + post$exit_lag[,j], post$exit_spread[,j])
+    
+    exp(post$log_run[,j] + log(entered - (entered * exited)))
+  }
+  )
+  spawn_curves.df <- bind_rows(spawn_curves.df, data.frame(
+    year = j + min(spawners$year)-1, 
+    day = -5:max(sp_dat$day)+day_stand,
+    fish = apply(live, 2, median),
+    l95 = apply(live, 2, quantile, probs = 0.025),
+    u95 = apply(live, 2, quantile, probs = 0.975)))
+}
+
+ggplot(spawn_curves.df, aes(x = day, y = fish))+
+  geom_line()+
+  geom_ribbon(aes(ymin = l95, ymax = u95), color = NA, alpha = 0.2)+
+  facet_wrap(~year, scales = "free_y")+
+  geom_point(data = index_sk, aes(x = yday, y = live), size = 0.8)+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Spawners present (thousands)", expand = expansion(mult = c(0, 0.05)))+
+  theme_bw()+
+  theme(strip.background = element_rect(color="NA", fill="NA"))+
+  scale_x_continuous(labels = ~ format(as.Date(.x, origin = "2023-12-31"), "%b"), 
+                     breaks = as.numeric(as.Date(c("2024-09-01", "2024-10-01", "2024-11-01")) - as.Date("2023-12-31")), name = "")+
+  theme(panel.grid.minor = element_blank())
+
+```
+
+```{r fig-obsfit, echo = FALSE, warning=FALSE, message=FALSE, fig.align='center', fig.height=5, fig.width=8, fig.cap = "Observed survey counts versus predicted on linear (A) and log (B) scales. Points and error bars show the posterior median and the 66% and 95% credible intervals.",}
+spread_draws(fit, live_mu[obs]) %>% 
+  left_join(index_sk %>% mutate(obs = 1:n())) %>% 
+  ggplot(aes(x = live, y = live_mu, group = obs))+
+  geom_abline(slope = 1, intercept = 0)+
+  stat_pointinterval()+
+  scale_y_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Expected count (thousands)")+
+  scale_x_continuous(labels = label_number(scale = 1e-3, suffix = "k"), name = "Observed count (thousands)")+
+  theme_bw()+
+  
+  spread_draws(fit, live_mu[obs]) %>% 
+  left_join(index_sk %>% mutate(obs = 1:n())) %>% 
+  ggplot(aes(x = live, y = live_mu, group = obs))+
+  geom_abline(slope = 1, intercept = 0)+
+  stat_pointinterval()+
+  scale_y_log10(name = "Expected count")+
+  scale_x_log10(name = "Observed count")+
+  theme_bw()+
+  
+  plot_annotation(tag_levels = "A")
+```
+
+```{r fig-cor, echo = FALSE, warning=FALSE, message=FALSE, fig.cap="Estimated pairwise correlations between the four timing parameters. Colour shows the posterior median correlation. Numbers indicate the proportion of posterior samples with the same sign (i.e., the posterior probability of a positive or negative association), rather than correlation coefficients.", fig.align='center', fig.height=4, fig.width=5}
+
+param_labels <- c(
+  "1" = expression(mu[y]^arrival),
+  "2" = expression(sigma[y]^arrival),
+  "3" = expression(sigma[y]^exit),
+  "4" = expression(mu[y]^exit_lag)
+)
+
+spread_draws(fit, Omega[parameter1, parameter2]) %>%
+  filter(parameter1 < parameter2) %>% 
+  group_by(parameter1, parameter2) %>% 
+  summarise(
+    correlation = median(Omega),
+    prop_positive = mean(Omega > 0),
+    prop_negative = mean(Omega < 0)
+  ) %>% 
+  mutate(
+    prop_direction = ifelse(prop_positive > prop_negative, prop_positive, prop_negative)
+  ) %>%
+  ggplot(aes(x = factor(parameter1), y = factor(parameter2), fill = correlation)) +
+  geom_tile() +
+  geom_text(aes(label = sprintf("%.2f", prop_direction)), color = "black") +
+  scale_fill_gradient2(low = "dodgerblue", high = "red", name = "Correlation") +
+  scale_x_discrete(labels = param_labels) +
+  scale_y_discrete(labels = param_labels) +
+  xlab("") + ylab("") +
+  theme_bw()
+```
