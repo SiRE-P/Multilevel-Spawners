@@ -11,7 +11,7 @@ output:
       toc: false
       number_sections: false
       fig_caption: true
-      keep_tex: false
+      keep_tex: true
       mathjax: default
 csl: ../../../../citation_resources/canadian-journal-of-fisheries-and-aquatic-sciences.csl
 bibliography: bibliography.bib

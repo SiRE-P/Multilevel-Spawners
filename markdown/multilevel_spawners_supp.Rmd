@@ -273,7 +273,7 @@ knitr::kable(
 
 
 
-```{r fig-map, echo = FALSE, warning=FALSE, message=FALSE, fig.cap = "The spawning grounds for Sockeye Salmon population that rear in the North Basin of Osoyoos Lake are 20 to 30 km upstream of the lake, in the Okanagan River below McIntyre Dam at the outflow of Vaseux Lake. River flows that affect spawners, eggs, and fry are monitored by Environment Canada (station 08NM085, also called station 08NM0001). Map produced by Margot Stockwell, Fisheries and Oceans Canada.", out.width="5in"}
+```{r fig-map, echo = FALSE, warning=FALSE, message=FALSE, fig.cap = "The spawning grounds of the sockeye salmon (Oncorhynchus nerka) population rearing in the North Basin of Osoyoos Lake are located 20–30 km upstream in the Okanagan River below McIntyre Dam at the outlet of Vaseux Lake. River flows affecting spawners, eggs, and fry are monitored at the Environment and Climate Change Canada hydrometric station 08NM085 (formerly 08NM0001). Map produced by Margot Stockwell (Fisheries and Oceans Canada). Base spatial data were derived from GeoBC (Province of British Columbia). Spatial data are referenced to the NAD83 Albers Equal Area Conic projected coordinate system.", out.width="5in"}
 
 knitr::include_graphics("../figures/Okanagan_to_Osoyoo_Lakes.png")
 ```
