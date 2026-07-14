@@ -1223,7 +1223,7 @@ The authors declare no competing interests.
 The data used in this study are the property of the Okanagan Nation Alliance. Please contact them directly concerning availability and acknowledgements: [Syilx.org](syilx.org).
 
 All scripts and stan model code are available for public access on
- GitHub (https://github.com/SiRE-P/Multilevel-Spawners) and Zenodo (https://doi.org/10.5281/zenodo.18395418).
+ GitHub (https://github.com/SiRE-P/Multilevel-Spawners) and Zenodo (https://doi.org/10.5281/zenodo.21362963).
 
 ## Funding statement
 This study was supported by a Collaborative Agreement between Fisheries and Oceans Canada and the Okanagan Nation Alliance, with funding provided by the Douglas County Public Utility District, WA, USA.
