@@ -42,8 +42,6 @@ header-includes:
       \renewcommand{\thetable}{S\arabic{table}}%
       \setcounter{figure}{0}%
       \renewcommand{\thefigure}{S\arabic{figure}}%
-  - |
-    \usepackage{orcidlink}
     }
 ---
 \newpage
